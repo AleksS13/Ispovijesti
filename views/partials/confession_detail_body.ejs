@@ -1,0 +1,40 @@
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <div class="card p-4">
+      <h2 class="mb-3">Ispovijest</h2>
+
+      <p><%= confession.text %></p>
+      <small class="text-muted">
+        Status: <strong><%= confession.status %></strong>
+        <% if (confession.published_at) { %>
+          | Objavljeno: <%= new Date(confession.published_at).toLocaleString() %>
+        <% } else { %>
+          | Kreirano: <%= new Date(confession.created_at).toLocaleString() %>
+        <% } %>
+      </small>
+
+      <hr />
+      <h4>Komentari</h4>
+
+      <% if (comments && comments.length) { %>
+        <ul class="list-group mb-3">
+          <% comments.forEach(c => { %>
+            <li class="list-group-item">
+              <strong><%= c.email || 'Gost' %></strong>: <%= c.content %><br/>
+              <small class="text-muted"><%= new Date(c.created_at).toLocaleString() %></small>
+            </li>
+          <% }) %>
+        </ul>
+      <% } else { %>
+        <p class="text-muted">Nema komentara.</p>
+      <% } %>
+
+      <form method="POST" action="/confessions/<%= confession.id %>/comment" class="card p-3">
+        <div class="mb-3">
+          <textarea name="content" class="form-control" rows="2" placeholder="Dodaj komentar..." required></textarea>
+        </div>
+        <button class="btn btn-primary">Pošalji komentar</button>
+      </form>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,51 @@
+<div class="row justify-content-center">
+  <div class="col-md-10">
+    <div class="card p-4">
+      <h2 class="mb-3">Korisnici</h2>
+
+      <% if (users && users.length) { %>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Email</th>
+                <th>Uloga</th>
+                <th>Aktivan</th>
+                <th>Blokiran do</th>
+                <th>Kreiran</th>
+                <th>Akcije</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% users.forEach(u => { %>
+                <tr>
+                  <td><%= u.id %></td>
+                  <td><%= u.email %></td>
+                  <td><%= u.role %></td>
+                  <td><%= u.is_active ? 'DA' : 'NE' %></td>
+                  <td><%= u.blocked_until ? new Date(u.blocked_until).toLocaleString() : '-' %></td>
+                  <td><%= new Date(u.created_at).toLocaleString() %></td>
+                  <td>
+                    <form method="POST" action="/admin/users/<%= u.id %>/block" class="d-inline">
+                      <input type="hidden" name="days" value="15" />
+                      <button class="btn btn-sm btn-warning">Blokiraj 15d</button>
+                    </form>
+                    <form method="POST" action="/admin/users/<%= u.id %>/deactivate" class="d-inline">
+                      <button class="btn btn-sm btn-outline-danger">Deaktiviraj</button>
+                    </form>
+                    <form method="POST" action="/admin/users/<%= u.id %>/activate" class="d-inline">
+                      <button class="btn btn-sm btn-success">Aktiviraj/Unblock</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } else { %>
+        <p class="text-muted">Nema korisnika.</p>
+      <% } %>
+    </div>
+  </div>
+</div>

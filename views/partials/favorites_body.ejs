@@ -1,0 +1,29 @@
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <div class="card p-4">
+      <h2 class="mb-3">Moji favoriti</h2>
+
+      <% if (confessions && confessions.length) { %>
+        <div class="list-group">
+          <% confessions.forEach(c => { %>
+            <div class="list-group-item">
+              <p><%= c.text %></p>
+              <small class="text-muted">
+                👍 <%= c.like_count || 0 %> | 💬 <%= c.comment_count || 0 %> |
+                U favoritima od: <%= new Date(c.fav_since).toLocaleString() %>
+              </small>
+              <div class="mt-2">
+                <a href="/confessions/<%= c.id %>" class="btn btn-sm btn-outline-secondary">Detalji</a>
+                <form method="POST" action="/confessions/<%= c.id %>/unfavorite" style="display:inline;">
+                  <button class="btn btn-sm btn-outline-danger">Ukloni iz favorita</button>
+                </form>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      <% } else { %>
+        <p class="text-muted">Nema favorita.</p>
+      <% } %>
+    </div>
+  </div>
+</div>

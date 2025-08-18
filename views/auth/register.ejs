@@ -1,0 +1,15 @@
+<%- include('../partials/layout', { title: 'Registracija', body: `
+  <h2 class="mb-3">Registracija</h2>
+  ${error ? `<div class="alert alert-danger">${error}</div>` : ``}
+  <form method="POST" action="/auth/register" class="card p-3">
+    <div class="mb-3">
+      <label class="form-label">Email</label>
+      <input name="email" type="email" class="form-control" required />
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Lozinka</label>
+      <input name="password" type="password" class="form-control" required minlength="6" />
+    </div>
+    <button class="btn btn-primary">Kreiraj nalog</button>
+  </form>
+` }) %>

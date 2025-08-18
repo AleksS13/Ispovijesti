@@ -1,0 +1,61 @@
+<%- include('partials/layout', { title: 'Početna', body: `
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card p-4">
+        <h2 class="mb-3">Početna</h2>
+
+        ${currentUser
+          ? `<div class="alert alert-success">Prijavljeni ste kao <strong>${currentUser.email}</strong>.</div>`
+          : `<div class="alert alert-info">Pregledavate kao <strong>Gost</strong>. 
+               <a href="/auth/login">Prijava</a> ili 
+               <a href="/auth/register">Registracija</a> za dodatne opcije.</div>` }
+
+        <ul class="nav nav-tabs mb-3">
+          <li class="nav-item">
+            <a class="nav-link ${activeTab === 'popular' ? 'active' : ''}" href="/feed/popular">Popularne (24h)</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link ${activeTab === 'best' ? 'active' : ''}" href="/feed/best">Najbolje</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link ${activeTab === 'latest' ? 'active' : ''}" href="/feed/latest">Najnovije</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link ${activeTab === 'random' ? 'active' : ''}" href="/feed/random">Random</a>
+          </li>
+        </ul>
+
+        ${confessions && confessions.length > 0
+          ? `<div class="list-group mb-3">
+               ${confessions.map(c => `
+                 <div class="list-group-item">
+                   <p>${c.text}</p>
+                   <small class="text-muted">
+                     👍 ${c.like_count || 0} | 💬 ${c.comment_count || 0}
+                   </small>
+                   <div class="mt-2">
+                     <form method="POST" action="/routes/confessions.js/${c.id}/like" style="display:inline;">
+                       <button class="btn btn-sm btn-outline-primary">Like</button>
+                     </form>
+                     <form method="POST" action="/routes/confessions/${c.id}/approve" style="display:inline;">
+                       <button class="btn btn-sm btn-success">Odobri</button>
+                     </form>
+                     <a href="/confessions/${c.id}" class="btn btn-sm btn-outline-secondary">Komentari</a>
+                   </div>
+                 </div>
+               `).join('')}
+             </div>`
+          : `<p class="text-muted">Nema ispovijesti za prikaz.</p>` }
+
+        <hr/>
+        <h4>Dodaj novu ispovijest</h4>
+        <form method="POST" action="/confessions/new" class="card p-3">
+          <div class="mb-3">
+            <textarea name="text" class="form-control" rows="3" placeholder="Napišite anonimnu ispovijest..." required></textarea>
+          </div>
+          <button class="btn btn-primary">Objavi</button>
+        </form>
+      </div>
+    </div>
+  </div>
+` }) %>
