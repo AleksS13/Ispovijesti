@@ -1,10 +1,8 @@
-// routes/home.js
 const express = require('express');
 const router = express.Router();
 const { query } = require('../db');
 
-// Početna stranica (tretiramo je isto kao "najnovije")
-router.get('/', async (req, res) => {
+router.get('/home', async (req, res) => {
   try {
     const { rows } = await query(`
       SELECT c.id, c.text,
@@ -17,12 +15,10 @@ router.get('/', async (req, res) => {
     `);
 
     res.render('home', {
-  title: 'Početna',
-  currentUser: req.session ? req.session.user : null, // ✅ sigurnija provjera
-  confessions: rows,
-  activeTab: 'latest'
-});
-
+      title: 'Početna',
+      confessions: rows,
+      activeTab: 'latest'
+    });
   } catch (err) {
     console.error('home route error', err);
     res.status(500).send('Greška na serveru.');

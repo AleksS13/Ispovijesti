@@ -2,18 +2,20 @@ require('dotenv').config();
 const path = require('path');
 const express = require('express');
 const session = require('express-session');
+const { pool } = require('./db');
+
 const homeRoutes = require('./routes/home');
 const feedRoutes = require('./routes/feed');
 const confessionRoutes = require('./routes/confessions');
 const adminRoutes = require('./routes/admin');
-const { pool } = require('./db');
+const authRoutes = require('./routes/auth');
 
+// test konekcije
 pool.query('SELECT NOW()').then(r => {
   console.log('📅 DB test OK:', r.rows[0].now);
 }).catch(err => {
   console.error('❌ DB test FAIL:', err.message);
 });
-
 
 const app = express();
 
@@ -21,42 +23,32 @@ const app = express();
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.urlencoded({ extended: true })); // form-urlencoded
-app.use('/', feedRoutes);
-app.use('/', homeRoutes);
-app.use('/', confessionRoutes);
-app.use('/', adminRoutes);
+app.use(express.urlencoded({ extended: true }));
 
-
-// Session (za početak MemoryStore je OK lokalno)
+// Session (⚠️ ovo MORA ići prije ruta!)
 app.use(session({
-  secret: process.env.SESSION_SECRET,
+  secret: process.env.SESSION_SECRET || 'dev_secret_change_me',
   resave: false,
   saveUninitialized: false,
 }));
 
-// Globalni helper u EJS-u
+// Globalni helper u EJS-u (svaki view vidi currentUser)
 app.use((req, res, next) => {
-  res.locals.currentUser = req.session.user || null;
+  res.locals.currentUser = req.session?.user || null;
   next();
 });
 
 // Rute
-const authRoutes = require('./routes/auth');
+app.use('/', feedRoutes);
+app.use('/', homeRoutes);
+app.use('/', confessionRoutes);
+app.use('/', adminRoutes);
 app.use('/auth', authRoutes);
 
+// Landing page
 app.get('/', (req, res) => {
   if (req.session.user) return res.redirect('/home');
   res.render('index', { title: 'Ispovijesti' });
-});
-
-app.get('/home', (req, res) => {
-  res.render('home', {
-    title: 'Početna',
-    currentUser: req.session.user || null,
-    confessions: [],   // makar prazan niz
-    activeTab: 'latest'
-  });
 });
 
 const PORT = process.env.PORT || 3000;

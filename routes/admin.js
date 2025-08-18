@@ -22,7 +22,6 @@ router.get('/admin/confessions', requireAdmin, async (req, res) => {
 
     res.render('admin/confessions', {
       title: 'Admin - Ispovijesti',
-      currentUser: req.session.user || null,
       confessions: rows,
       activeStatus: status
     });
