@@ -8,15 +8,60 @@ router.get('/admin', requireAdmin, (req, res) => {
   res.redirect('/admin/confessions?status=waiting');
 });
 
-// Lista ispovijesti po statusu (waiting ili rejected_ai)
+// Admin dashboard
+router.get('/admin/dashboard', requireAdmin, async (req, res) => {
+  try {
+    const stats = {};
+
+    // broj korisnika
+    const { rows: userCount } = await query(`SELECT COUNT(*) FROM users`);
+    stats.users = parseInt(userCount[0].count, 10);
+
+    // broj ispovijesti (ukupno i po statusima)
+    const { rows: confTotal } = await query(`SELECT COUNT(*) FROM confessions`);
+    stats.confessions_total = parseInt(confTotal[0].count, 10);
+
+    const { rows: confByStatus } = await query(`
+      SELECT status, COUNT(*) 
+      FROM confessions 
+      GROUP BY status
+    `);
+    stats.confessions_by_status = confByStatus;
+
+    // broj komentara
+    const { rows: commentsCount } = await query(`SELECT COUNT(*) FROM comments`);
+    stats.comments = parseInt(commentsCount[0].count, 10);
+
+    // broj lajkova
+    const { rows: likesCount } = await query(`SELECT COUNT(*) FROM likes`);
+    stats.likes = parseInt(likesCount[0].count, 10);
+
+    // broj favorita
+    const { rows: favCount } = await query(`SELECT COUNT(*) FROM favorites`);
+    stats.favorites = parseInt(favCount[0].count, 10);
+
+    res.render('admin/dashboard', {
+      title: 'Admin – Dashboard',
+      stats,
+      currentUser: req.session.user
+    });
+  } catch (err) {
+    console.error('dashboard error', err);
+    res.status(500).send('Greška pri učitavanju dashboarda.');
+  }
+});
+
+
+// Lista ispovijesti po statusu
 router.get('/admin/confessions', requireAdmin, async (req, res) => {
   const status = req.query.status || 'waiting';
+
   try {
     const { rows } = await query(
-      `SELECT id, text, status, created_at
+      `SELECT id, text, status, created_at, published_at
        FROM confessions
        WHERE status = $1
-       ORDER BY created_at ASC`,
+       ORDER BY created_at DESC`,
       [status]
     );
 
@@ -30,6 +75,7 @@ router.get('/admin/confessions', requireAdmin, async (req, res) => {
     res.status(500).send('Greška pri učitavanju ispovijesti.');
   }
 });
+
 
 // Objavi ispovijest
 router.post('/admin/confessions/:id/publish', requireAdmin, async (req, res) => {

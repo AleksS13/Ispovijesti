@@ -1,36 +1,7 @@
-<%- include('../partials/layout', { title: title, body: `
-  <h2 class="mb-3">Admin – Ispovijesti (${activeStatus})</h2>
-
-  <ul class="nav nav-tabs mb-3">
-    <li class="nav-item">
-      <a class="nav-link ${activeStatus === 'waiting' ? 'active' : ''}" href="/admin/confessions?status=waiting">Na čekanju</a>
-    </li>
-    <li class="nav-item">
-      <a class="nav-link ${activeStatus === 'rejected_ai' ? 'active' : ''}" href="/admin/confessions?status=rejected_ai">AI odbijene</a>
-    </li>
-  </ul>
-
-  ${confessions.length === 0 
-    ? `<div class="alert alert-info">Nema ispovijesti u ovoj kategoriji.</div>` 
-    : `
-      <ul class="list-group">
-        ${confessions.map(c => `
-          <li class="list-group-item">
-            <div><strong>#${c.id}</strong> – ${c.text}</div>
-            <small class="text-muted">${new Date(c.created_at).toLocaleString()}</small>
-            <div class="mt-2">
-              <form method="POST" action="/admin/confessions/${c.id}/publish" style="display:inline;">
-                <button class="btn btn-sm btn-success">Objavi</button>
-              </form>
-              <form method="POST" action="/admin/confessions/${c.id}/reject" style="display:inline;">
-                <button class="btn btn-sm btn-warning">Odbij</button>
-              </form>
-              <form method="POST" action="/admin/confessions/${c.id}/delete" style="display:inline;">
-                <button class="btn btn-sm btn-danger">Obriši</button>
-              </form>
-            </div>
-          </li>
-        `).join('')}
-      </ul>
-    `}
-` }) %>
+<%- include('../partials/layout', {
+  title: 'Admin – Ispovijesti',
+  body: include('../partials/admin_confessions_body', {
+    confessions,
+    activeStatus
+  })
+}) %>

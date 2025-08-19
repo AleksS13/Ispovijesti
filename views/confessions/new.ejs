@@ -1,0 +1,13 @@
+<%- include('../partials/layout', { title: title, body: `
+  <h2 class="mb-3">Dodaj ispovijest</h2>
+
+  ${error ? `<div class="alert alert-danger">${error}</div>` : ``}
+
+  <form method="POST" action="/confessions/new" class="card p-3">
+    <div class="mb-3">
+      <label class="form-label">Tvoja ispovijest</label>
+      <textarea name="text" class="form-control" rows="5" required minlength="10"></textarea>
+    </div>
+    <button class="btn btn-primary">Pošalji</button>
+  </form>
+` }) %>

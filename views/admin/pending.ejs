@@ -1,0 +1,29 @@
+<%- include('../partials/layout', {
+  title: 'Ispovijesti na čekanju',
+  body: `
+    <h2 class="mb-3">Ispovijesti na čekanju</h2>
+
+    <% if (confessions.length === 0) { %>
+      <div class="alert alert-info">Nema ispovijesti na čekanju.</div>
+    <% } else { %>
+      <div class="list-group">
+        <% confessions.forEach(c => { %>
+          <div class="list-group-item">
+            <p class="mb-1"><%= c.text %></p>
+            <small class="text-muted">
+              Poslano: <%= new Date(c.created_at).toLocaleString('bs-BA') %>
+            </small>
+            <div class="mt-2">
+              <form action="/confessions/<%= c.id %>/approve" method="POST" class="d-inline">
+                <button class="btn btn-sm btn-success">Odobri</button>
+              </form>
+              <form action="/confessions/<%= c.id %>/reject" method="POST" class="d-inline">
+                <button class="btn btn-sm btn-danger">Odbij</button>
+              </form>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    <% } %>
+  `
+}) %>

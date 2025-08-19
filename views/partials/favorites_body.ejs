@@ -1,29 +1,23 @@
-<div class="row justify-content-center">
-  <div class="col-md-8">
-    <div class="card p-4">
-      <h2 class="mb-3">Moji favoriti</h2>
+<h2 class="mb-3">Moji favoriti</h2>
 
-      <% if (confessions && confessions.length) { %>
-        <div class="list-group">
-          <% confessions.forEach(c => { %>
-            <div class="list-group-item">
-              <p><%= c.text %></p>
-              <small class="text-muted">
-                👍 <%= c.like_count || 0 %> | 💬 <%= c.comment_count || 0 %> |
-                U favoritima od: <%= new Date(c.fav_since).toLocaleString() %>
-              </small>
-              <div class="mt-2">
-                <a href="/confessions/<%= c.id %>" class="btn btn-sm btn-outline-secondary">Detalji</a>
-                <form method="POST" action="/confessions/<%= c.id %>/unfavorite" style="display:inline;">
-                  <button class="btn btn-sm btn-outline-danger">Ukloni iz favorita</button>
-                </form>
-              </div>
-            </div>
-          <% }) %>
+<% if (confessions.length === 0) { %>
+  <div class="alert alert-info">Još nemaš nijednu ispovijest u favoritima.</div>
+<% } else { %>
+  <div class="list-group">
+    <% confessions.forEach(c => { %>
+      <div class="list-group-item">
+        <p class="mb-1"><%= c.text %></p>
+        <small class="text-muted">
+          ❤️ <%= c.like_count %> | 💬 <%= c.comment_count %> | Dodano: 
+          <%= new Date(c.fav_since).toLocaleString('bs-BA') %>
+        </small>
+        <div class="mt-2">
+          <form action="/confessions/<%= c.id %>/unfavorite" method="POST" class="d-inline">
+            <button class="btn btn-sm btn-outline-danger">Ukloni</button>
+          </form>
+          <a href="/confessions/<%= c.id %>" class="btn btn-sm btn-outline-primary">Detalji</a>
         </div>
-      <% } else { %>
-        <p class="text-muted">Nema favorita.</p>
-      <% } %>
-    </div>
+      </div>
+    <% }) %>
   </div>
-</div>
+<% } %>

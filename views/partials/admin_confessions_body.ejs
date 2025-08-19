@@ -1,48 +1,36 @@
-<div class="row justify-content-center">
-  <div class="col-md-10">
-    <div class="card p-4">
-      <h2 class="mb-3">Ispovijesti — <%= status %></h2>
+<h2 class="mb-3">Admin – Ispovijesti (<%= activeStatus %>)</h2>
 
-      <ul class="nav nav-tabs mb-3">
-        <li class="nav-item"><a class="nav-link <%= status==='waiting' ? 'active' : '' %>" href="/admin/confessions?status=waiting">Čekaju</a></li>
-        <li class="nav-item"><a class="nav-link <%= status==='rejected_ai' ? 'active' : '' %>" href="/admin/confessions?status=rejected_ai">AI odbijene</a></li>
-        <li class="nav-item"><a class="nav-link <%= status==='published' ? 'active' : '' %>" href="/admin/confessions?status=published">Objavljene</a></li>
-        <li class="nav-item"><a class="nav-link <%= status==='rejected' ? 'active' : '' %>" href="/admin/confessions?status=rejected">Ručno odbijene</a></li>
-      </ul>
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item">
+    <a class="nav-link <%= activeStatus === 'waiting' ? 'active' : '' %>"
+       href="/admin/confessions?status=waiting">Na čekanju</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link <%= activeStatus === 'rejected_ai' ? 'active' : '' %>"
+       href="/admin/confessions?status=rejected_ai">AI odbijene</a>
+  </li>
+</ul>
 
-      <% if (confessions && confessions.length) { %>
-        <div class="list-group">
-          <% confessions.forEach(c => { %>
-            <div class="list-group-item">
-              <p><%= c.text %></p>
-              <small class="text-muted">
-                Status: <strong><%= c.status %></strong> |
-                Bodovi: <%= c.score %> |
-                Kreirano: <%= new Date(c.created_at).toLocaleString() %>
-                <% if (c.published_at) { %> | Objavljeno: <%= new Date(c.published_at).toLocaleString() %> <% } %>
-              </small>
-              <div class="mt-2">
-                <% if (c.status !== 'published') { %>
-                  <form method="POST" action="/admin/confessions/<%= c.id %>/publish" style="display:inline;">
-                    <button class="btn btn-sm btn-success">Objavi</button>
-                  </form>
-                <% } %>
-                <% if (c.status !== 'rejected') { %>
-                  <form method="POST" action="/admin/confessions/<%= c.id %>/reject" style="display:inline;">
-                    <button class="btn btn-sm btn-warning">Odbij</button>
-                  </form>
-                <% } %>
-                <form method="POST" action="/admin/confessions/<%= c.id %>/delete" style="display:inline;">
-                  <button class="btn btn-sm btn-outline-danger">Obriši</button>
-                </form>
-                <a class="btn btn-sm btn-outline-secondary" href="/confessions/<%= c.id %>">Detalji</a>
-              </div>
-            </div>
-          <% }) %>
+<% if (confessions.length === 0) { %>
+  <div class="alert alert-info">Nema ispovijesti u ovoj kategoriji.</div>
+<% } else { %>
+  <ul class="list-group">
+    <% confessions.forEach(c => { %>
+      <li class="list-group-item">
+        <div><strong>#<%= c.id %></strong> – <%= c.text %></div>
+        <small class="text-muted"><%= new Date(c.created_at).toLocaleString() %></small>
+        <div class="mt-2">
+          <form method="POST" action="/admin/confessions/<%= c.id %>/publish" class="d-inline">
+            <button class="btn btn-sm btn-success">Objavi</button>
+          </form>
+          <form method="POST" action="/admin/confessions/<%= c.id %>/reject" class="d-inline">
+            <button class="btn btn-sm btn-warning">Odbij</button>
+          </form>
+          <form method="POST" action="/admin/confessions/<%= c.id %>/delete" class="d-inline">
+            <button class="btn btn-sm btn-danger">Obriši</button>
+          </form>
         </div>
-      <% } else { %>
-        <p class="text-muted">Nema ispovijesti za prikaz za ovaj status.</p>
-      <% } %>
-    </div>
-  </div>
-</div>
+      </li>
+    <% }) %>
+  </ul>
+<% } %>

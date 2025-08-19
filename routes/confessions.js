@@ -4,6 +4,16 @@ const router = express.Router();
 const { query } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 
+
+// --- GET forma za novu ispovijest ---
+router.get('/confessions/new', requireAuth, (req, res) => {
+  res.render('confessions/new', { 
+    title: 'Nova ispovijest',
+    error: null 
+  });
+});
+
+
 // --- 1) Nova ispovijest (sa fake AI moderacijom) ---
 router.post('/confessions/new', async (req, res) => {
   const { text } = req.body;

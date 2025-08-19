@@ -1,40 +1,56 @@
-<div class="row justify-content-center">
-  <div class="col-md-8">
-    <div class="card p-4">
-      <h2 class="mb-3">Ispovijest</h2>
-
-      <p><%= confession.text %></p>
-      <small class="text-muted">
-        Status: <strong><%= confession.status %></strong>
-        <% if (confession.published_at) { %>
-          | Objavljeno: <%= new Date(confession.published_at).toLocaleString() %>
-        <% } else { %>
-          | Kreirano: <%= new Date(confession.created_at).toLocaleString() %>
-        <% } %>
-      </small>
-
-      <hr />
-      <h4>Komentari</h4>
-
-      <% if (comments && comments.length) { %>
-        <ul class="list-group mb-3">
-          <% comments.forEach(c => { %>
-            <li class="list-group-item">
-              <strong><%= c.email || 'Gost' %></strong>: <%= c.content %><br/>
-              <small class="text-muted"><%= new Date(c.created_at).toLocaleString() %></small>
-            </li>
-          <% }) %>
-        </ul>
-      <% } else { %>
-        <p class="text-muted">Nema komentara.</p>
-      <% } %>
-
-      <form method="POST" action="/confessions/<%= confession.id %>/comment" class="card p-3">
-        <div class="mb-3">
-          <textarea name="content" class="form-control" rows="2" placeholder="Dodaj komentar..." required></textarea>
-        </div>
-        <button class="btn btn-primary">Pošalji komentar</button>
+<div class="card mb-4">
+  <div class="card-body">
+    <p class="card-text"><%= confession.text %></p>
+    <small class="text-muted">
+      Objavljeno: 
+      <%= confession.published_at 
+            ? new Date(confession.published_at).toLocaleString('bs-BA') 
+            : 'Na čekanju' %>
+    </small>
+  </div>
+  <div class="card-footer d-flex justify-content-between">
+    <div>
+      ❤️ <%= confession.like_count || 0 %> 
+      | 💬 <%= comments.length %>
+    </div>
+    <div>
+      <form action="/confessions/<%= confession.id %>/like" method="POST" class="d-inline">
+        <button class="btn btn-sm btn-outline-danger">Like</button>
       </form>
+
+      <% if (currentUser) { %>
+        <form action="/confessions/<%= confession.id %>/favorite" method="POST" class="d-inline">
+          <button class="btn btn-sm btn-outline-warning">⭐ Favorite</button>
+        </form>
+      <% } %>
     </div>
   </div>
 </div>
+
+<!-- Komentari -->
+<h4>Komentari</h4>
+
+<% if (comments.length === 0) { %>
+  <div class="alert alert-secondary">Nema komentara.</div>
+<% } else { %>
+  <ul class="list-group mb-3">
+    <% comments.forEach(c => { %>
+      <li class="list-group-item">
+        <p class="mb-1"><%= c.content %></p>
+        <small class="text-muted">
+          <% if (c.email) { %><%= c.email %><% } else { %>Gost<% } %> - 
+          <%= new Date(c.created_at).toLocaleString('bs-BA') %>
+        </small>
+      </li>
+    <% }) %>
+  </ul>
+<% } %>
+
+<!-- Forma za komentar -->
+<form action="/confessions/<%= confession.id %>/comment" method="POST" class="card p-3">
+  <div class="mb-3">
+    <label class="form-label">Dodaj komentar</label>
+    <textarea name="content" class="form-control" rows="3" required></textarea>
+  </div>
+  <button class="btn btn-primary">Objavi komentar</button>
+</form>

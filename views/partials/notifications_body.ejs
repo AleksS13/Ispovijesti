@@ -1,35 +1,38 @@
-<div class="row justify-content-center">
-  <div class="col-md-8">
-    <div class="card p-4">
-      <h2 class="mb-3">Notifikacije</h2>
+<h2 class="mb-3">Notifikacije</h2>
 
-      <form method="POST" action="/notifications/read-all" class="mb-3">
-        <button class="btn btn-sm btn-outline-primary">Označi sve kao pročitano</button>
-      </form>
-
-      <% if (notifications && notifications.length) { %>
-        <div class="list-group">
-          <% notifications.forEach(n => { %>
-            <div class="list-group-item <%= n.is_read ? '' : 'list-group-item-info' %>">
-              <div><strong><%= n.type === 'comment_on_favorite' ? 'Novi komentar na tvoj favorit' : n.type %></strong></div>
-              <div class="small text-muted"><%= new Date(n.created_at).toLocaleString() %></div>
-              <% if (n.payload && n.payload.snippet) { %>
-                <div><%= n.payload.snippet %></div>
-              <% } %>
-              <div class="mt-2">
-                <a class="btn btn-sm btn-outline-secondary" href="/confessions/<%= n.confession_id %>">Otvori ispovijest</a>
-                <% if (!n.is_read) { %>
-                  <form method="POST" action="/notifications/<%= n.id %>/read" style="display:inline;">
-                    <button class="btn btn-sm btn-success">Označi pročitano</button>
-                  </form>
-                <% } %>
-              </div>
-            </div>
-          <% }) %>
+<% if (notifications.length === 0) { %>
+  <div class="alert alert-info">Nema notifikacija.</div>
+<% } else { %>
+  <ul class="list-group mb-3">
+    <% notifications.forEach(n => { %>
+      <li class="list-group-item d-flex justify-content-between align-items-start">
+        <div>
+          <p class="mb-1">
+            <% if (n.type === 'comment_on_favorite') { %>
+              Novi komentar na tvojoj omiljenoj ispovijesti
+            <% } else { %>
+              <%= n.type %>
+            <% } %>
+          </p>
+          <% if (n.payload && n.payload.snippet) { %>
+            <small class="text-muted">"<%= n.payload.snippet %>"</small><br>
+          <% } %>
+          <small class="text-muted">
+            <%= new Date(n.created_at).toLocaleString('bs-BA') %>
+          </small>
         </div>
-      <% } else { %>
-        <p class="text-muted">Nema notifikacija.</p>
-      <% } %>
-    </div>
-  </div>
-</div>
+        <div>
+          <% if (!n.is_read) { %>
+            <form action="/notifications/<%= n.id %>/read" method="POST" class="d-inline">
+              <button class="btn btn-sm btn-success">Označi pročitano</button>
+            </form>
+          <% } %>
+        </div>
+      </li>
+    <% }) %>
+  </ul>
+
+  <form action="/notifications/read-all" method="POST">
+    <button class="btn btn-outline-primary">Označi sve kao pročitano</button>
+  </form>
+<% } %>
