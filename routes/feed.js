@@ -1,58 +1,98 @@
-// routes/feed.js
 const express = require('express');
 const router = express.Router();
 const { query } = require('../db');
 
-// Helper za render
-async function renderFeed(res, tab, sql, params = []) {
-  try {
-    const { rows } = await query(sql, params);
-    res.render('feed', {
-      title: 'Feed',
-      currentUser: res.locals.currentUser,
-      confessions: rows,
-      activeTab: tab
-    });
-  } catch (err) {
-    console.error('feed error', err);
-    res.status(500).send('Greška pri učitavanju feeda.');
-  }
+// helper: renderuj home sa listom ispovijesti
+function renderFeed(res, req, rows, activeTab) {
+  res.render('home', {
+    title: 'Početna',
+    currentUser: req.session.user || null,
+    confessions: rows,
+    activeTab, // koji tab je aktivan
+  });
 }
+
+// Popularne (zadnja 24h)
+router.get('/feed/popular', async (req, res) => {
+  try {
+    const { rows } = await query(`
+      SELECT c.id, c.text,
+             COUNT(DISTINCT l.id) AS like_count,
+             COUNT(DISTINCT cm.id) AS comment_count
+      FROM confessions c
+      LEFT JOIN likes l ON l.confession_id = c.id
+        AND l.created_at >= NOW() - INTERVAL '24 hours'
+      LEFT JOIN comments cm ON cm.confession_id = c.id
+      WHERE c.status = 'published'
+      GROUP BY c.id
+      ORDER BY like_count DESC, c.created_at DESC
+      LIMIT 20
+    `);
+    renderFeed(res, req, rows, 'popular');
+  } catch (err) {
+    console.error('popular feed error', err);
+    res.status(500).send('Greška na serveru.');
+  }
+});
+
+// Najbolje (sve vrijeme)
+router.get('/feed/best', async (req, res) => {
+  try {
+    const { rows } = await query(`
+      SELECT c.id, c.text,
+             COUNT(DISTINCT l.id) AS like_count,
+             COUNT(DISTINCT cm.id) AS comment_count
+      FROM confessions c
+      LEFT JOIN likes l ON l.confession_id = c.id
+      LEFT JOIN comments cm ON cm.confession_id = c.id
+      WHERE c.status = 'published'
+      GROUP BY c.id
+      ORDER BY like_count DESC, c.created_at DESC
+      LIMIT 20
+    `);
+    renderFeed(res, req, rows, 'best');
+  } catch (err) {
+    console.error('best feed error', err);
+    res.status(500).send('Greška na serveru.');
+  }
+});
 
 // Najnovije
 router.get('/feed/latest', async (req, res) => {
-  await renderFeed(res, 'latest',
-    `SELECT c.id, c.text, c.created_at,
-            (SELECT COUNT(*) FROM likes l WHERE l.confession_id = c.id) AS like_count,
-            (SELECT COUNT(*) FROM comments cm WHERE cm.confession_id = c.id) AS comment_count
-     FROM confessions c
-     WHERE c.status = 'published'
-     ORDER BY c.created_at DESC
-     LIMIT 50`);
+  try {
+    const { rows } = await query(`
+      SELECT c.id, c.text,
+             (SELECT COUNT(*) FROM likes l WHERE l.confession_id = c.id) AS like_count,
+             (SELECT COUNT(*) FROM comments cm WHERE cm.confession_id = c.id) AS comment_count
+      FROM confessions c
+      WHERE c.status = 'published'
+      ORDER BY c.created_at DESC
+      LIMIT 20
+    `);
+    renderFeed(res, req, rows, 'latest');
+  } catch (err) {
+    console.error('latest feed error', err);
+    res.status(500).send('Greška na serveru.');
+  }
 });
 
-// Popularne (24h)
-router.get('/feed/popular', async (req, res) => {
-  await renderFeed(res, 'popular',
-    `SELECT c.id, c.text, c.created_at,
-            (SELECT COUNT(*) FROM likes l WHERE l.confession_id = c.id AND l.created_at > NOW() - interval '24 hours') AS like_count,
-            (SELECT COUNT(*) FROM comments cm WHERE cm.confession_id = c.id) AS comment_count
-     FROM confessions c
-     WHERE c.status = 'published'
-     ORDER BY like_count DESC NULLS LAST
-     LIMIT 50`);
-});
-
-// Najbolje (ukupno)
-router.get('/feed/best', async (req, res) => {
-  await renderFeed(res, 'best',
-    `SELECT c.id, c.text, c.created_at,
-            (SELECT COUNT(*) FROM likes l WHERE l.confession_id = c.id) AS like_count,
-            (SELECT COUNT(*) FROM comments cm WHERE cm.confession_id = c.id) AS comment_count
-     FROM confessions c
-     WHERE c.status = 'published'
-     ORDER BY like_count DESC
-     LIMIT 50`);
+// Random
+router.get('/feed/random', async (req, res) => {
+  try {
+    const { rows } = await query(`
+      SELECT c.id, c.text,
+             (SELECT COUNT(*) FROM likes l WHERE l.confession_id = c.id) AS like_count,
+             (SELECT COUNT(*) FROM comments cm WHERE cm.confession_id = c.id) AS comment_count
+      FROM confessions c
+      WHERE c.status = 'published'
+      ORDER BY random()
+      LIMIT 20
+    `);
+    renderFeed(res, req, rows, 'random');
+  } catch (err) {
+    console.error('random feed error', err);
+    res.status(500).send('Greška na serveru.');
+  }
 });
 
 module.exports = router;

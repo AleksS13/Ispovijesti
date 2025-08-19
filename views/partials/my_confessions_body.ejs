@@ -1,0 +1,29 @@
+<h2 class="mb-3">Moje ispovijesti</h2>
+
+<% if (confessions.length === 0) { %>
+  <div class="alert alert-info">Još nemaš nijednu ispovijest.</div>
+<% } else { %>
+  <div class="list-group">
+    <% confessions.forEach(c => { %>
+      <div class="list-group-item">
+        <div class="d-flex justify-content-between">
+          <div>
+            <p class="mb-1"><%= c.text %></p>
+            <small class="text-muted">
+              Status: <strong><%= c.status %></strong>
+              <% if (c.status === 'published' && c.published_at) { %>
+                | Objavljeno: <%= new Date(c.published_at).toLocaleString() %>
+              <% } else { %>
+                | Kreirano: <%= new Date(c.created_at).toLocaleString() %>
+              <% } %>
+              | ❤️ <%= c.like_count %> | 💬 <%= c.comment_count %>
+            </small>
+          </div>
+          <div class="ms-3 text-end">
+            <a class="btn btn-sm btn-outline-primary" href="/confessions/<%= c.id %>">Detalji</a>
+          </div>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+<% } %>

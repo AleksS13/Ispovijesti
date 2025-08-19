@@ -1,9 +1,31 @@
-var express = require('express');
-var router = express.Router();
+// routes/users.js
+const express = require('express');
+const router = express.Router();
+const { query } = require('../db');
+const { requireAuth } = require('../middleware/auth');
 
-/* GET users listing. */
-router.get('/', function(req, res, next) {
-  res.send('respond with a resource');
+// Moje ispovijesti (ulogovani korisnik)
+router.get('/me/confessions', requireAuth, async (req, res) => {
+  const userId = req.session.user.id;
+  try {
+    const { rows } = await query(`
+      SELECT c.id, c.text, c.status, c.created_at, c.published_at,
+             (SELECT COUNT(*) FROM likes l WHERE l.confession_id = c.id) AS like_count,
+             (SELECT COUNT(*) FROM comments cm WHERE cm.confession_id = c.id) AS comment_count
+      FROM confessions c
+      WHERE c.user_id = $1
+      ORDER BY c.created_at DESC
+      LIMIT 100
+    `, [userId]);
+
+    res.render('users/my_confessions', {
+      title: 'Moje ispovijesti',
+      confessions: rows
+    });
+  } catch (err) {
+    console.error('my confessions error', err);
+    res.status(500).send('Greška pri učitavanju tvojih ispovijesti.');
+  }
 });
 
 module.exports = router;

@@ -9,6 +9,7 @@ const feedRoutes = require('./routes/feed');
 const confessionRoutes = require('./routes/confessions');
 const adminRoutes = require('./routes/admin');
 const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/users');
 
 // test konekcije
 pool.query('SELECT NOW()').then(r => {
@@ -44,6 +45,7 @@ app.use('/', homeRoutes);
 app.use('/', confessionRoutes);
 app.use('/', adminRoutes);
 app.use('/auth', authRoutes);
+app.use('/', userRoutes);
 
 // Landing page
 app.get('/', (req, res) => {
