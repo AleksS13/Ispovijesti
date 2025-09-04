@@ -1,7 +1,11 @@
 <%- include('../partials/layout', {
-  title: 'Admin – Ispovijesti',
+  title: title,
   body: include('../partials/admin_confessions_body', {
     confessions,
-    activeStatus
+    activeStatus,
+    page,
+    limit,
+    total,
+    totalPages
   })
 }) %>

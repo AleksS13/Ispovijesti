@@ -29,16 +29,22 @@
             <a class="nav-link" href="/favorites">Moji favoriti</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="/notifications">Notifikacije</a>
+            <a class="nav-link d-flex align-items-center" href="/notifications">
+              Notifikacije
+              <% if (typeof unreadNotifCount !== 'undefined' && unreadNotifCount > 0) { %>
+                <span class="badge bg-danger ms-1"><%= unreadNotifCount > 99 ? '99+' : unreadNotifCount %></span>
+              <% } %>
+            </a>
           </li>
           <% if (currentUser.role === 'admin') { %>
             <li class="nav-item">
               <a class="nav-link" href="/admin/confessions">Admin panel</a>
             </li>
           <% } %>
-          <li class="nav-item">
-            <form action="/auth/logout" method="POST" class="d-inline">
-              <button class="btn btn-outline-light btn-sm">Odjava</button>
+          <!-- Odjava kao nav-item, poravnata vertikalno s linkovima -->
+          <li class="nav-item d-flex align-items-center">
+            <form action="/auth/logout" method="POST" class="m-0">
+              <button class="btn btn-outline-light btn-sm ms-lg-2">Odjava</button>
             </form>
           </li>
         <% } else { %>

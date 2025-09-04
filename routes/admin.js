@@ -51,24 +51,44 @@ router.get('/admin/dashboard', requireAdmin, async (req, res) => {
   }
 });
 
-
-// Lista ispovijesti po statusu
+// Lista ispovijesti po statusu (sa paginacijom)
 router.get('/admin/confessions', requireAdmin, async (req, res) => {
-  const status = req.query.status || 'waiting';
+  const allowed = new Set(['waiting', 'rejected_ai', 'rejected', 'published']);
+  const status = allowed.has(req.query.status) ? req.query.status : 'waiting';
+
+  const page = Math.max(parseInt(req.query.page || '1', 10), 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 5), 100);
+  const offset = (page - 1) * limit;
 
   try {
+    // ukupno za taj status
+    const { rows: countRows } = await query(
+      `SELECT COUNT(*)::int AS total
+       FROM confessions
+       WHERE status = $1`,
+      [status]
+    );
+    const total = countRows[0].total || 0;
+    const totalPages = Math.max(Math.ceil(total / limit), 1);
+
+    // stranica
     const { rows } = await query(
       `SELECT id, text, status, created_at, published_at
        FROM confessions
        WHERE status = $1
-       ORDER BY created_at DESC`,
-      [status]
+       ORDER BY created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [status, limit, offset]
     );
 
     res.render('admin/confessions', {
       title: 'Admin - Ispovijesti',
       confessions: rows,
-      activeStatus: status
+      activeStatus: status,
+      page,
+      limit,
+      total,
+      totalPages
     });
   } catch (err) {
     console.error('admin list error', err);
@@ -77,34 +97,47 @@ router.get('/admin/confessions', requireAdmin, async (req, res) => {
 });
 
 
-// Objavi ispovijest
+
+// Objavi ispovijest (admin)
 router.post('/admin/confessions/:id/publish', requireAdmin, async (req, res) => {
-  const confessionId = req.params.id;
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    return res.status(400).send('Neispravan ID.');
+  }
   try {
-    await query(
+    const { rowCount } = await query(
       `UPDATE confessions
        SET status = 'published', published_at = NOW()
        WHERE id = $1`,
-      [confessionId]
+      [id]
     );
-    res.redirect('back');
+    if (rowCount === 0) {
+      return res.status(404).send('Ispovijest nije pronađena.');
+    }
+    return res.redirect('/admin/confessions?status=waiting');
   } catch (err) {
     console.error('publish error', err);
-    res.status(500).send('Greška pri objavi ispovijesti.');
+    return res.status(500).send('Greška pri objavi: ' + err.message);
   }
 });
 
 // Odbij ispovijest
 router.post('/admin/confessions/:id/reject', requireAdmin, async (req, res) => {
-  const confessionId = req.params.id;
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    return res.status(400).send('Neispravan ID.');
+  }
   try {
-    await query(
+    const { rowCount } = await query(
       `UPDATE confessions
        SET status = 'rejected'
        WHERE id = $1`,
-      [confessionId]
+      [id]
     );
-    res.redirect('back');
+    if (rowCount === 0) {
+      return res.status(404).send('Ispovijest nije pronađena.');
+    }
+    return res.redirect('/admin/confessions?status=waiting');
   } catch (err) {
     console.error('reject error', err);
     res.status(500).send('Greška pri odbijanju ispovijesti.');
@@ -113,10 +146,16 @@ router.post('/admin/confessions/:id/reject', requireAdmin, async (req, res) => {
 
 // Obriši ispovijest
 router.post('/admin/confessions/:id/delete', requireAdmin, async (req, res) => {
-  const confessionId = req.params.id;
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    return res.status(400).send('Neispravan ID.');
+  }
   try {
-    await query(`DELETE FROM confessions WHERE id = $1`, [confessionId]);
-    res.redirect('back');
+    const { rowCount } = await query(`DELETE FROM confessions WHERE id = $1`, [id]);
+    if (rowCount === 0) {
+      return res.status(404).send('Ispovijest nije pronađena.');
+    }
+    return res.redirect('/admin/confessions?status=waiting');
   } catch (err) {
     console.error('delete error', err);
     res.status(500).send('Greška pri brisanju ispovijesti.');
