@@ -4,17 +4,20 @@ const router = express.Router();
 const { query } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 
+// helper da prepoznamo da li klijent traži JSON (AJAX)
+function wantsJSON(req) {
+  return req.xhr || (req.get('accept') || '').includes('application/json');
+}
 
-// --- GET forma za novu ispovijest ---
-router.get('/confessions/new', requireAuth, (req, res) => {
-  res.render('confessions/new', { 
+// --- 0) Forma za NOVU ispovijest (MORA ispred '/:id') ---
+router.get('/confessions/new', (req, res) => {
+  res.render('confessions/new', {
     title: 'Nova ispovijest',
-    error: null 
+    currentUser: req.session.user || null
   });
 });
 
-
-// --- 1) Nova ispovijest (sa fake AI moderacijom) ---
+// --- 1) Kreiranje nove ispovijesti ---
 router.post('/confessions/new', async (req, res) => {
   const { text } = req.body;
   if (!text || text.trim().length < 5) {
@@ -22,8 +25,6 @@ router.post('/confessions/new', async (req, res) => {
   }
 
   const content = text.trim();
-
-  // Fake AI moderacija: jednostavna “blacklist”
   const banned = [/idiot/i, /mrzim/i, /ubiti/i, /govno/i, /psihop/i];
   const isBad = banned.some(rx => rx.test(content));
 
@@ -33,10 +34,10 @@ router.post('/confessions/new', async (req, res) => {
     if (isBad) { status = 'rejected_ai'; aiFlagged = true; }
 
     const { rows } = await query(
-      `INSERT INTO confessions (text, status, ai_flagged)
-       VALUES ($1, $2, $3)
+      `INSERT INTO confessions (text, status, ai_flagged, user_id)
+       VALUES ($1, $2, $3, $4)
        RETURNING id`,
-      [content, status, aiFlagged]
+      [content, status, aiFlagged, req.session.user ? req.session.user.id : null]
     );
     const newId = rows[0].id;
 
@@ -51,14 +52,14 @@ router.post('/confessions/new', async (req, res) => {
 
     res.redirect('/feed/latest');
   } catch (err) {
-    console.error('confession insert + AI error', err);
+    console.error('confession insert error', err);
     res.status(500).send('Greška pri unosu ispovijesti.');
   }
 });
 
 // --- 2) Detalji ispovijesti + komentari ---
 router.get('/confessions/:id', async (req, res) => {
-  const confessionId = req.params.id;
+  const confessionId = Number(req.params.id);
   try {
     const { rows: confessionRows } = await query(
       `SELECT id, text, status, created_at, published_at
@@ -92,38 +93,35 @@ router.get('/confessions/:id', async (req, res) => {
   }
 });
 
-// --- 3) Dodavanje komentara + notifikacije favoritima ---
-router.post('/confessions/:id/comment', async (req, res) => {
-  const confessionId = req.params.id;
+// --- 3) Dodavanje komentara (samo registrovani) ---
+router.post('/confessions/:id/comment', requireAuth, async (req, res) => {
+  const confessionId = Number(req.params.id);
   const { content } = req.body;
   if (!content || content.trim().length < 2) {
-    return res.status(400).send('Komentar je prekratak.');
+    return res.status(400).send('Komentar je prekratka.');
   }
 
   try {
-    let userId = null;
-    let sessionTokenHash = null;
-    if (req.session.user) userId = req.session.user.id;
-    else sessionTokenHash = req.sessionID;
+    const userId = Number(req.session.user.id);
 
     await query(
       `INSERT INTO comments (confession_id, user_id, session_token_hash, content)
-       VALUES ($1, $2, $3, $4)`,
-      [confessionId, userId, sessionTokenHash, content.trim()]
+       VALUES ($1, $2, NULL, $3)`,
+      [confessionId, userId, content.trim()]
     );
 
-    // Notifikacije za sve koji imaju ovaj confession u favoritima (osim autora komentara)
     await query(
       `INSERT INTO notifications (user_id, confession_id, type, is_read, payload)
        SELECT f.user_id, $1, 'comment_on_favorite', FALSE,
               jsonb_build_object(
-                'snippet', substr($2, 1, 120),
+                'by_user_id', $2,
+                'snippet', substr($3, 1, 120),
                 'at', to_char(NOW(), 'YYYY-MM-DD"T"HH24:MI:SSOF')
               )
        FROM favorites f
        WHERE f.confession_id = $1
-         AND ($3::BIGINT IS NULL OR f.user_id <> $3)`,
-      [confessionId, content.trim(), userId]
+         AND f.user_id <> $2`,
+      [confessionId, userId, content.trim()]
     );
 
     res.redirect(`/confessions/${confessionId}`);
@@ -133,38 +131,91 @@ router.post('/confessions/:id/comment', async (req, res) => {
   }
 });
 
-// --- 4) Lajkovanje ispovijesti ---
-router.post('/confessions/:id/like', async (req, res) => {
-  const confessionId = req.params.id;
-  try {
-    let userId = null;
-    let sessionTokenHash = null;
-    if (req.session.user) userId = req.session.user.id;
-    else sessionTokenHash = req.sessionID;
+// --- 4) Lajkovanje (samo registrovani, JSON ili redirect) ---
+router.post('/confessions/:id/like', requireAuth, async (req, res) => {
+  const confessionId = parseInt(req.params.id, 10);
+  const userId = parseInt(req.session.user?.id, 10);
 
+  // brza validacija ulaza
+  if (!Number.isInteger(confessionId) || !Number.isInteger(userId)) {
+    const msg = 'Bad ids: confessionId/userId nisu cijeli brojevi';
+    return wantsJSON(req) ? res.status(400).json({ ok: false, error: msg })
+                          : res.status(400).send(msg);
+  }
+
+  try {
+    await query('BEGIN');
+
+    // ✅ Idempotentni toggle + eksplicitni kastovi
+    const toggleSql = `
+      WITH deleted AS (
+        DELETE FROM likes
+        WHERE user_id = $1::bigint AND confession_id = $2::bigint
+        RETURNING 1
+      )
+      INSERT INTO likes (user_id, confession_id, session_token_hash)
+      SELECT $1::bigint, $2::bigint, NULL::text
+      WHERE NOT EXISTS (SELECT 1 FROM deleted)
+      RETURNING 1;
+    `;
+    const toggle = await query(toggleSql, [userId, confessionId]);
+    const liked = toggle.rowCount > 0;
+
+    // COUNT sa kastom
+    const { rows } = await query(
+      'SELECT COUNT(*)::int AS count FROM likes WHERE confession_id = $1::bigint',
+      [confessionId]
+    );
+    const count = rows[0].count;
+
+    // Notifikacije (kastovi u WHERE i payload)
     await query(
-      `INSERT INTO likes (confession_id, user_id, session_token_hash)
-       VALUES ($1, $2, $3)
-       ON CONFLICT DO NOTHING`,
-      [confessionId, userId, sessionTokenHash]
+      `INSERT INTO notifications (user_id, confession_id, type, is_read, payload)
+       SELECT f.user_id, $1::bigint, 'like_on_favorite', FALSE,
+              jsonb_build_object(
+                'by_user_id', $2::bigint,
+                'at', to_char(NOW(), 'YYYY-MM-DD"T"HH24:MI:SSOF')
+              )
+       FROM favorites f
+       WHERE f.confession_id = $1::bigint
+         AND f.user_id <> $2::bigint`,
+      [confessionId, userId]
     );
 
-    res.redirect('back');
+    await query('COMMIT');
+
+    if (wantsJSON(req)) {
+      return res.json({ ok: true, liked, count });
+    }
+    return res.redirect('back');
   } catch (err) {
+    await query('ROLLBACK');
     console.error('like error', err);
-    res.status(500).send('Greška pri lajkovanju.');
+    if (wantsJSON(req)) {
+      return res.status(500).json({ ok: false, error: 'Greška pri lajkovanju.' });
+    }
+    return res.status(500).send('Greška pri lajkovanju.');
   }
 });
 
-// --- 5) Odobravanje (bodovi) + auto publish >= 10 ---
+
+// --- 5) Odobravanje (JSON ili redirect) ---
 router.post('/confessions/:id/approve', async (req, res) => {
-  const confessionId = req.params.id;
+  const confessionId = Number(req.params.id);
+  if (!Number.isInteger(confessionId)) {
+    return wantsJSON(req)
+      ? res.status(400).json({ ok: false, error: 'Bad confession id' })
+      : res.status(400).send('Bad confession id');
+  }
+
   try {
     let userId = null;
     let sessionTokenHash = null;
-    let weight = 1; // gost = 1
-    if (req.session.user) { userId = req.session.user.id; weight = 3; }
+    let weight = 1;
+    if (req.session.user) { userId = Number(req.session.user.id); weight = 3; }
     else sessionTokenHash = req.sessionID;
+
+    await query('BEGIN');
 
     await query(
       `INSERT INTO approvals (confession_id, user_id, session_token_hash, weight)
@@ -173,12 +224,26 @@ router.post('/confessions/:id/approve', async (req, res) => {
       [confessionId, userId, sessionTokenHash, weight]
     );
 
+    await query(
+      `INSERT INTO notifications (user_id, confession_id, type, is_read, payload)
+       SELECT f.user_id, $1, 'approve_on_favorite', FALSE,
+              jsonb_build_object(
+                'by_user_id', $2,
+                'weight', $3,
+                'at', to_char(NOW(), 'YYYY-MM-DD"T"HH24:MI:SSOF')
+              )
+       FROM favorites f
+       WHERE f.confession_id = $1
+         AND ($2::BIGINT IS NULL OR f.user_id <> $2)`,
+      [confessionId, userId, weight]
+    );
+
     const { rows } = await query(
-      `SELECT COALESCE(SUM(weight),0) AS score
+      `SELECT COALESCE(SUM(weight),0)::int AS score
        FROM approvals WHERE confession_id = $1`,
       [confessionId]
     );
-    const score = parseInt(rows[0].score, 10);
+    const score = rows[0].score;
 
     if (score >= 10) {
       await query(
@@ -189,17 +254,33 @@ router.post('/confessions/:id/approve', async (req, res) => {
       );
     }
 
-    res.redirect('back');
+    // uzmi aktuelni status nakon eventualnog update-a
+    const { rows: st } = await query(
+      `SELECT status FROM confessions WHERE id = $1`,
+      [confessionId]
+    );
+
+    await query('COMMIT');
+
+    if (wantsJSON(req)) {
+      return res.json({ ok: true, approved: true, score, status: st[0]?.status || 'unknown' });
+    }
+    return res.redirect('back');
   } catch (err) {
+    await query('ROLLBACK');
     console.error('approve error', err);
-    res.status(500).send('Greška pri odobravanju.');
+    if (wantsJSON(req)) {
+      return res.status(500).json({ ok: false, error: 'Greška pri odobravanju.' });
+    }
+    return res.status(500).send('Greška pri odobravanju.');
   }
 });
 
-// --- 6) Dodaj u favorite (samo registrovani) ---
+
+// --- 6) Favoriti ---
 router.post('/confessions/:id/favorite', requireAuth, async (req, res) => {
-  const confessionId = req.params.id;
-  const userId = req.session.user.id;
+  const confessionId = Number(req.params.id);
+  const userId = Number(req.session.user.id);
   try {
     await query(
       `INSERT INTO favorites (user_id, confession_id)
@@ -214,10 +295,9 @@ router.post('/confessions/:id/favorite', requireAuth, async (req, res) => {
   }
 });
 
-// --- 7) Ukloni iz favorita ---
 router.post('/confessions/:id/unfavorite', requireAuth, async (req, res) => {
-  const confessionId = req.params.id;
-  const userId = req.session.user.id;
+  const confessionId = Number(req.params.id);
+  const userId = Number(req.session.user.id);
   try {
     await query(
       `DELETE FROM favorites WHERE user_id = $1 AND confession_id = $2`,
@@ -230,14 +310,14 @@ router.post('/confessions/:id/unfavorite', requireAuth, async (req, res) => {
   }
 });
 
-// --- 8) Moji favoriti (lista) ---
+// --- 7) Lista MOJIH favorita ---
 router.get('/favorites', requireAuth, async (req, res) => {
-  const userId = req.session.user.id;
+  const userId = Number(req.session.user.id);
   try {
     const { rows } = await query(
       `SELECT c.id, c.text,
-              (SELECT COUNT(*) FROM likes l WHERE l.confession_id = c.id) AS like_count,
-              (SELECT COUNT(*) FROM comments cm WHERE cm.confession_id = c.id) AS comment_count,
+              (SELECT COUNT(*)::int FROM likes l WHERE l.confession_id = c.id) AS like_count,
+              (SELECT COUNT(*)::int FROM comments cm WHERE cm.confession_id = c.id) AS comment_count,
               f.created_at AS fav_since
        FROM favorites f
        JOIN confessions c ON c.id = f.confession_id
@@ -255,63 +335,6 @@ router.get('/favorites', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('favorites list error', err);
     res.status(500).send('Greška pri učitavanju favorita.');
-  }
-});
-
-// --- 9) Notifikacije (lista) ---
-router.get('/notifications', requireAuth, async (req, res) => {
-  const userId = req.session.user.id;
-  try {
-    const { rows } = await query(
-      `SELECT id, confession_id, type, is_read, payload, created_at
-       FROM notifications
-       WHERE user_id = $1
-       ORDER BY is_read ASC, created_at DESC
-       LIMIT 200`,
-      [userId]
-    );
-
-    res.render('notifications', {
-      title: 'Notifikacije',
-      currentUser: req.session.user,
-      notifications: rows
-    });
-  } catch (err) {
-    console.error('notifications list error', err);
-    res.status(500).send('Greška pri učitavanju notifikacija.');
-  }
-});
-
-// --- 10) Označi pročitano ---
-router.post('/notifications/:id/read', requireAuth, async (req, res) => {
-  const userId = req.session.user.id;
-  const notifId = req.params.id;
-  try {
-    await query(
-      `UPDATE notifications SET is_read = TRUE
-       WHERE id = $1 AND user_id = $2`,
-      [notifId, userId]
-    );
-    res.redirect('back');
-  } catch (err) {
-    console.error('notification read error', err);
-    res.status(500).send('Greška pri označavanju notifikacije.');
-  }
-});
-
-// --- 11) Označi sve kao pročitano ---
-router.post('/notifications/read-all', requireAuth, async (req, res) => {
-  const userId = req.session.user.id;
-  try {
-    await query(
-      `UPDATE notifications SET is_read = TRUE
-       WHERE user_id = $1 AND is_read = FALSE`,
-      [userId]
-    );
-    res.redirect('back');
-  } catch (err) {
-    console.error('notifications read-all error', err);
-    res.status(500).send('Greška pri označavanju svih notifikacija.');
   }
 });
 

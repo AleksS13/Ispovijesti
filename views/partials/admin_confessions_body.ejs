@@ -17,16 +17,20 @@
   <ul class="list-group">
     <% confessions.forEach(c => { %>
       <li class="list-group-item">
-        <div><strong>#<%= c.id %></strong> – <%= c.text %></div>
+        <div>
+          <strong>#<%= c.id %></strong> – <%= c.text %>
+          <span class="badge bg-secondary ms-2"><%= c.status %></span>
+        </div>
         <small class="text-muted"><%= new Date(c.created_at).toLocaleString() %></small>
-        <div class="mt-2">
+        <div class="mt-2 d-flex gap-2">
           <form method="POST" action="/admin/confessions/<%= c.id %>/publish" class="d-inline">
             <button class="btn btn-sm btn-success">Objavi</button>
           </form>
           <form method="POST" action="/admin/confessions/<%= c.id %>/reject" class="d-inline">
             <button class="btn btn-sm btn-warning">Odbij</button>
           </form>
-          <form method="POST" action="/admin/confessions/<%= c.id %>/delete" class="d-inline">
+          <form method="POST" action="/admin/confessions/<%= c.id %>/delete" class="d-inline"
+                onsubmit="return confirm('Jeste li sigurni da želite obrisati ovu ispovijest?');">
             <button class="btn btn-sm btn-danger">Obriši</button>
           </form>
         </div>

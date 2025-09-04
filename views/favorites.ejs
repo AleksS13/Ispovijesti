@@ -1,4 +1,43 @@
 <%- include('partials/layout', {
   title: 'Moji favoriti',
-  body: include('partials/favorites_body', { confessions, currentUser })
+  body: `
+    <h2 class="mb-3">Moji favoriti</h2>
+
+    ${!currentUser
+      ? `<div class="alert alert-info">
+           Samo registrovani korisnici mogu da imaju favorite. 
+           <a href="/auth/login">Prijavi se</a> ili 
+           <a href="/auth/register">Registruj se</a>.
+         </div>`
+      : (confessions.length === 0
+        ? `<div class="alert alert-warning">Nema sačuvanih ispovijesti.</div>`
+        : `<div class="list-group">
+             ${confessions.map(c => `
+               <div class="list-group-item d-flex flex-column gap-2">
+                 <p>${c.text}</p>
+                 <div class="d-flex align-items-center gap-2">
+
+                   <!-- 👍 Like dugme -->
+                   <button class="btn btn-sm btn-outline-primary like-btn" data-id="${c.id}">
+                     👍 <span class="like-count" id="like-count-${c.id}" data-id="${c.id}">
+                       ${c.like_count || 0}
+                     </span>
+                   </button>
+
+                   <!-- 💬 Broj komentara -->
+                   <small class="text-muted">💬 ${c.comment_count || 0}</small>
+
+                   <!-- 📅 Kada je sačuvano -->
+                   <small class="text-muted">Sačuvano: ${new Date(c.fav_since).toLocaleString()}</small>
+
+                   <!-- ❌ Ukloni iz favorita -->
+                   <form method="POST" action="/confessions/${c.id}/unfavorite" style="display:inline;">
+                     <button class="btn btn-sm btn-outline-danger">Ukloni</button>
+                   </form>
+                 </div>
+               </div>
+             `).join('')}
+           </div>` )
+    }
+  `
 }) %>

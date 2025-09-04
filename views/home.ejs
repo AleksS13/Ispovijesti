@@ -8,11 +8,11 @@
           ? `<div class="alert alert-success">Prijavljeni ste kao <strong>${currentUser.email}</strong>.</div>`
           : `<div class="alert alert-info">Pregledavate kao <strong>Gost</strong>. 
                <a href="/auth/login">Prijava</a> ili 
-               <a href="/auth/register">Registracija</a> za dodatne opcije.</div>` }
+               <a href="/auth/register">Registracija</a>.</div>` }
 
         <ul class="nav nav-tabs mb-3">
           <li class="nav-item">
-            <a class="nav-link ${activeTab === 'popular' ? 'active' : ''}" href="/feed/popular">Popularne (24h)</a>
+            <a class="nav-link ${activeTab === 'popular' ? 'active' : ''}" href="/feed/popular">Popularne</a>
           </li>
           <li class="nav-item">
             <a class="nav-link ${activeTab === 'best' ? 'active' : ''}" href="/feed/best">Najbolje</a>
@@ -30,17 +30,33 @@
                ${confessions.map(c => `
                  <div class="list-group-item">
                    <p>${c.text}</p>
-                   <small class="text-muted">
-                     👍 ${c.like_count || 0} | 💬 ${c.comment_count || 0}
-                   </small>
-                   <div class="mt-2">
-                     <form method="POST" action="/routes/confessions.js/${c.id}/like" style="display:inline;">
-                       <button class="btn btn-sm btn-outline-primary">Like</button>
-                     </form>
-                     <form method="POST" action="/routes/confessions/${c.id}/approve" style="display:inline;">
-                       <button class="btn btn-sm btn-success">Odobri</button>
-                     </form>
+                   <div class="d-flex align-items-center gap-2">
+
+                     <!-- 👍 Like dugme -->
+                     <button class="btn btn-sm btn-outline-primary like-btn" data-id="${c.id}">
+                       👍 <span class="like-count" id="like-count-${c.id}" data-id="${c.id}">
+                         ${c.like_count || 0}
+                       </span>
+                     </button>
+
+                     <!-- 💬 Broj komentara -->
+                     <small class="text-muted">💬 ${c.comment_count || 0}</small>
+
+                     <!-- 🏷️ Status: feed pokazuje samo objavljene -->
+                     <span class="badge bg-success ms-2 status-badge" data-id="${c.id}">
+                       published
+                     </span>
+
+                     <!-- ⭐ Favorit (klasičan POST) -->
+                     ${currentUser
+                       ? `<form method="POST" action="/confessions/${c.id}/favorite" style="display:inline;">
+                            <button class="btn btn-sm btn-outline-warning">Favorit</button>
+                          </form>`
+                       : `` }
+
+                     <!-- 🔗 Komentari link -->
                      <a href="/confessions/${c.id}" class="btn btn-sm btn-outline-secondary">Komentari</a>
+
                    </div>
                  </div>
                `).join('')}

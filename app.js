@@ -10,6 +10,7 @@ const confessionRoutes = require('./routes/confessions');
 const adminRoutes = require('./routes/admin');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
+const apiRoutes = require('./routes/api');
 
 // test konekcije
 pool.query('SELECT NOW()').then(r => {
@@ -47,10 +48,11 @@ app.use('/', adminRoutes);
 app.use('/auth', authRoutes);
 app.use('/', userRoutes);
 
+
+
 // Landing page
 app.get('/', (req, res) => {
-  if (req.session.user) return res.redirect('/home');
-  res.render('index', { title: 'Ispovijesti' });
+  res.redirect('/home');
 });
 
 const PORT = process.env.PORT || 3000;
