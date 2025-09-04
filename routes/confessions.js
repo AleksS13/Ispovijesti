@@ -76,13 +76,15 @@ router.get('/confessions/:id', async (req, res) => {
   const confessionId = Number(req.params.id);
   try {
     const { rows: confessionRows } = await query(
-      `SELECT c.id, c.text, c.status, c.created_at, c.published_at,
-              (SELECT COUNT(*)::int FROM likes    l WHERE l.confession_id = c.id) AS like_count,
-              (SELECT COUNT(*)::int FROM comments m WHERE m.confession_id = c.id) AS comment_count
-       FROM confessions c
-       WHERE c.id = $1`,
-      [confessionId]
-    );
+  `SELECT c.id, c.text, c.status, c.created_at, c.published_at,
+          (SELECT COUNT(*)::int FROM likes l WHERE l.confession_id = c.id) AS like_count,
+          (SELECT COUNT(*)::int FROM comments cm WHERE cm.confession_id = c.id) AS comment_count,
+          (SELECT COUNT(*)::int FROM favorites f WHERE f.confession_id = c.id) AS favorite_count
+   FROM confessions c
+   WHERE c.id = $1`,
+  [confessionId]
+);
+
     if (confessionRows.length === 0) {
       return res.status(404).send('Ispovijest ne postoji.');
     }
@@ -406,17 +408,19 @@ router.get('/favorites', requireAuth, async (req, res) => {
   const userId = Number(req.session.user.id);
   try {
     const { rows } = await query(
-      `SELECT c.id, c.text,
-              (SELECT COUNT(*)::int FROM likes l WHERE l.confession_id = c.id) AS like_count,
-              (SELECT COUNT(*)::int FROM comments cm WHERE cm.confession_id = c.id) AS comment_count,
-              f.created_at AS fav_since
-       FROM favorites f
-       JOIN confessions c ON c.id = f.confession_id
-       WHERE f.user_id = $1
-       ORDER BY f.created_at DESC
-       LIMIT 100`,
-      [userId]
-    );
+  `SELECT c.id, c.text,
+          (SELECT COUNT(*)::int FROM likes l WHERE l.confession_id = c.id) AS like_count,
+          (SELECT COUNT(*)::int FROM comments cm WHERE cm.confession_id = c.id) AS comment_count,
+          (SELECT COUNT(*)::int FROM favorites ff WHERE ff.confession_id = c.id) AS favorite_count,
+          f.created_at AS fav_since
+   FROM favorites f
+   JOIN confessions c ON c.id = f.confession_id
+   WHERE f.user_id = $1
+   ORDER BY f.created_at DESC
+   LIMIT 100`,
+  [userId]
+);
+
 
     res.render('favorites', {
       title: 'Moji favoriti',

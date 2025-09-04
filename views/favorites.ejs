@@ -24,8 +24,9 @@
                      </span>
                    </button>
 
-                   <!-- 💬 Broj komentara -->
+                   <!-- 💬 i ⭐ -->
                    <small class="text-muted">💬 ${c.comment_count || 0}</small>
+                   <small class="text-muted">⭐ ${c.favorite_count || 0}</small>
 
                    <!-- 📅 Kada je sačuvano -->
                    <small class="text-muted">Sačuvano: ${new Date(c.fav_since).toLocaleString()}</small>
