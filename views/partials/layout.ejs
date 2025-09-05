@@ -21,7 +21,13 @@
 
     <div class="collapse navbar-collapse" id="navbarMain">
       <ul class="navbar-nav ms-auto">
+
         <% if (currentUser) { %>
+          <!-- Vidljivo SVIMA: Odobravaj -->
+          <li class="nav-item">
+            <a class="nav-link" href="/approve">Odobri</a>
+          </li>
+
           <li class="nav-item">
             <a class="nav-link" href="/confessions/new">Nova ispovijest</a>
           </li>
@@ -36,18 +42,29 @@
               <% } %>
             </a>
           </li>
+
           <% if (currentUser.role === 'admin') { %>
             <li class="nav-item">
               <a class="nav-link" href="/admin/confessions">Admin panel</a>
             </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/admin/users">Korisnici</a>
+            </li>
           <% } %>
+
           <!-- Odjava kao nav-item, poravnata vertikalno s linkovima -->
           <li class="nav-item d-flex align-items-center">
             <form action="/auth/logout" method="POST" class="m-0">
               <button class="btn btn-outline-light btn-sm ms-lg-2">Odjava</button>
             </form>
           </li>
+
         <% } else { %>
+          <!-- Vidljivo SVIMA: Odobravaj (gosti imaju weight=1) -->
+          <li class="nav-item">
+            <a class="nav-link" href="/approve">Odobri</a>
+          </li>
+
           <li class="nav-item">
             <a class="btn btn-outline-light btn-sm me-2" href="/auth/login">Prijava</a>
           </li>
@@ -55,6 +72,7 @@
             <a class="btn btn-primary btn-sm" href="/auth/register">Registracija</a>
           </li>
         <% } %>
+
       </ul>
     </div>
   </div>

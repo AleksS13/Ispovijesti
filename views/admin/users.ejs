@@ -1,4 +1,82 @@
-<%- include('../partials/layout', {
-  title: 'Admin · Korisnici',
-  body: include('../partials/admin_users_body', { users })
-}) %>
+<%- include('../partials/layout', { title: title, body: `
+  <h2 class="mb-3">Admin – Korisnici</h2>
+
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Email</th>
+          <th>Uloga</th>
+          <th>Status</th>
+          <th>Aktivnost</th>
+          <th class="text-end">Akcije</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${users.map(u => `
+          <tr>
+            <td>${u.id}</td>
+            <td>${u.email}</td>
+            <td><span class="badge ${u.role === 'admin' ? 'bg-danger' : 'bg-secondary'}">${u.role}</span></td>
+            <td>
+              ${u.is_active
+                ? '<span class="badge bg-success">aktivno</span>'
+                : '<span class="badge bg-secondary">neaktivno</span>'}
+              ${u.blocked_until
+                ? `<span class="badge bg-warning ms-1">blokiran do ${new Date(u.blocked_until).toLocaleString()}</span>`
+                : ''}
+            </td>
+            <td>
+              ❤️ ${u.conf_count} &nbsp;|&nbsp; 💬 ${u.comment_count}
+            </td>
+            <td class="text-end">
+              <div class="d-flex gap-1 justify-content-end flex-wrap">
+                ${u.is_active
+                  ? `<form method="POST" action="/admin/users/${u.id}/deactivate">
+                      <button class="btn btn-sm btn-outline-secondary">Deaktiviraj</button>
+                     </form>`
+                  : `<form method="POST" action="/admin/users/${u.id}/activate">
+                      <button class="btn btn-sm btn-outline-success">Aktiviraj</button>
+                     </form>`
+                }
+
+                <!-- Blokiraj 15 -->
+                <form method="POST" action="/admin/users/${u.id}/block">
+                  <input type="hidden" name="days" value="15"/>
+                  <button class="btn btn-sm btn-outline-warning">Blokiraj 15d</button>
+                </form>
+
+                <!-- Blokiraj 30 -->
+                <form method="POST" action="/admin/users/${u.id}/block">
+                  <input type="hidden" name="days" value="30"/>
+                  <button class="btn btn-sm btn-outline-warning">Blokiraj 30d</button>
+                </form>
+
+                <!-- Unblock -->
+                <form method="POST" action="/admin/users/${u.id}/unblock">
+                  <button class="btn btn-sm btn-outline-primary">Unblock</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pager -->
+  <nav class="mt-3">
+    <ul class="pagination">
+      <li class="page-item ${page <= 1 ? 'disabled' : ''}">
+        <a class="page-link" href="/admin/users?page=${page - 1}&limit=${limit}">« Prethodna</a>
+      </li>
+      <li class="page-item disabled">
+        <span class="page-link">Strana ${page} / ${totalPages}</span>
+      </li>
+      <li class="page-item ${page >= totalPages ? 'disabled' : ''}">
+        <a class="page-link" href="/admin/users?page=${page + 1}&limit=${limit}">Sljedeća »</a>
+      </li>
+    </ul>
+  </nav>
+` }) %>

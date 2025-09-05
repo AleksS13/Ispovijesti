@@ -2,14 +2,51 @@
 const express = require('express');
 const router = express.Router();
 
-// ▼ VAŽNO: uzimamo i pool i query (pool treba za prave transakcije na istom konekšnu)
+// koristimo i pool i query (pool za transakcije na istom konekšnu)
 const { pool, query } = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const rateLimit = require('express-rate-limit');
 
 // helper: da prepoznamo da li klijent traži JSON (AJAX)
 function wantsJSON(req) {
   return req.xhr || (req.get('accept') || '').includes('application/json');
 }
+
+/* -------------------------------------------------------------------------- */
+/* Rate limit postavke (anti-spam)                                            */
+/* -------------------------------------------------------------------------- */
+function limitHandler(req, res /*, next */) {
+  const msg = 'Previše zahtjeva. Pokušaj kasnije.';
+  if (wantsJSON(req)) return res.status(429).json({ ok: false, error: msg });
+  return res.status(429).send(msg);
+}
+
+// Nova ispovijest: max 5 u 10 min po IP
+const newConfessionLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 5,
+  handler: limitHandler,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Komentari: max 15 u 5 min po IP
+const commentLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 15,
+  handler: limitHandler,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// “Lagane” radnje: like/approve/favorite — max 60 u 1 min po IP
+const lightActionLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  handler: limitHandler,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 /* -------------------------------------------------------------------------- */
 /*  0) Forma za NOVU ispovijest (MORA ispred '/:id')                          */
@@ -23,10 +60,9 @@ router.get('/confessions/new', (req, res) => {
 
 /* -------------------------------------------------------------------------- */
 /*  1) Kreiranje nove ispovijesti                                             */
-/*  - Redirect sada vodi na /me/confessions (user vidi "waiting" zapis)       */
-/*  - Ako je AI-flag, vraćamo ga takođe na /me/confessions                    */
+/*  - Redirect vodi na /me/confessions da korisnik vidi svoj zapis            */
 /* -------------------------------------------------------------------------- */
-router.post('/confessions/new', async (req, res) => {
+router.post('/confessions/new', newConfessionLimiter, async (req, res) => {
   const { text } = req.body;
   if (!text || text.trim().length < 5) {
     return res.status(400).send('Ispovijest je prekratka.');
@@ -56,34 +92,32 @@ router.post('/confessions/new', async (req, res) => {
          VALUES ($1, $2, $3, $4)`,
         [newId, 'offensive', 0.95, 'Fake AI: matched banned pattern']
       );
-      // ▼ umjesto slanja na admin rutu, vrati korisnika na svoje ispovijesti
       return res.redirect('/me/confessions');
     }
 
-    // ▼ korisnik vidi svoju novu ispovijest (waiting) odmah
-    res.redirect('/me/confessions');
+    return res.redirect('/me/confessions');
   } catch (err) {
     console.error('confession insert error', err);
-    res.status(500).send('Greška pri unosu ispovijesti.');
+    return res.status(500).send('Greška pri unosu ispovijesti.');
   }
 });
 
 /* -------------------------------------------------------------------------- */
 /*  2) Detalji ispovijesti + komentari                                        */
-/*  - SELECT sada vraća like_count i comment_count za UI                      */
+/*  - SELECT vraća like_count, comment_count, favorite_count za UI            */
 /* -------------------------------------------------------------------------- */
 router.get('/confessions/:id', async (req, res) => {
   const confessionId = Number(req.params.id);
   try {
     const { rows: confessionRows } = await query(
-  `SELECT c.id, c.text, c.status, c.created_at, c.published_at,
-          (SELECT COUNT(*)::int FROM likes l WHERE l.confession_id = c.id) AS like_count,
-          (SELECT COUNT(*)::int FROM comments cm WHERE cm.confession_id = c.id) AS comment_count,
-          (SELECT COUNT(*)::int FROM favorites f WHERE f.confession_id = c.id) AS favorite_count
-   FROM confessions c
-   WHERE c.id = $1`,
-  [confessionId]
-);
+      `SELECT c.id, c.text, c.status, c.created_at, c.published_at,
+              (SELECT COUNT(*)::int FROM likes     l  WHERE l.confession_id  = c.id) AS like_count,
+              (SELECT COUNT(*)::int FROM comments  cm WHERE cm.confession_id = c.id) AS comment_count,
+              (SELECT COUNT(*)::int FROM favorites f  WHERE f.confession_id  = c.id) AS favorite_count
+       FROM confessions c
+       WHERE c.id = $1`,
+      [confessionId]
+    );
 
     if (confessionRows.length === 0) {
       return res.status(404).send('Ispovijest ne postoji.');
@@ -99,7 +133,7 @@ router.get('/confessions/:id', async (req, res) => {
       [confessionId]
     );
 
-    res.render('confessions/detail', {
+    return res.render('confessions/detail', {
       title: 'Ispovijest',
       currentUser: req.session.user || null,
       confession,
@@ -107,16 +141,16 @@ router.get('/confessions/:id', async (req, res) => {
     });
   } catch (err) {
     console.error('confession detail error', err);
-    res.status(500).send('Greška na serveru.');
+    return res.status(500).send('Greška na serveru.');
   }
 });
 
 /* -------------------------------------------------------------------------- */
 /*  3) Dodavanje komentara (samo registrovani)                                */
-/*  - Notifikacije favoritima (castovi dodani)                                */
+/*  - Notifikacije favoritima (castovi)                                       */
 /*  - (Opcionalno) notifikacija AUTORU (castovi + napomena za CHECK)          */
 /* -------------------------------------------------------------------------- */
-router.post('/confessions/:id/comment', requireAuth, async (req, res) => {
+router.post('/confessions/:id/comment', requireAuth, commentLimiter, async (req, res) => {
   const confessionId = Number(req.params.id);
   const { content } = req.body;
   if (!content || content.trim().length < 2) {
@@ -150,11 +184,14 @@ router.post('/confessions/:id/comment', requireAuth, async (req, res) => {
     );
 
     // 3) (OPCIONALNO) notifikacija AUTORU ispovijesti
-    //    ⚠️ Ako želiš da se ovo zaista upisuje, proširi CHECK constraint:
+    //    ⚠️ Ako želiš i ovo, proširi CHECK:
     //    ALTER TABLE notifications DROP CONSTRAINT notifications_type_check;
     //    ALTER TABLE notifications
     //      ADD CONSTRAINT notifications_type_check
-    //      CHECK (type IN ('comment_on_favorite','approve_on_favorite','like_on_favorite','comment_on_confession'));
+    //      CHECK (type IN (
+    //        'comment_on_favorite','approve_on_favorite','like_on_favorite',
+    //        'comment_on_confession','like_on_confession'
+    //      ));
     try {
       await query(
         `INSERT INTO notifications (user_id, confession_id, type, is_read, payload)
@@ -171,24 +208,22 @@ router.post('/confessions/:id/comment', requireAuth, async (req, res) => {
         [confessionId, userId, text]
       );
     } catch (e) {
-      // ako CHECK još nije proširen ili drugi benigni razlog — samo loguj
       console.error('notif comment->author error (ignored):', e);
     }
 
-    res.redirect(`/confessions/${confessionId}`);
+    return res.redirect(`/confessions/${confessionId}`);
   } catch (err) {
     console.error('comment insert error', err);
-    res.status(500).send('Greška pri unosu komentara.');
+    return res.status(500).send('Greška pri unosu komentara.');
   }
 });
 
-
 /* -------------------------------------------------------------------------- */
 /*  4) Lajkovanje (samo registrovani)                                         */
-/*  - PRAVA transakcija na jednom konekšnu (client = pool.connect())          */
-/*  - Notifikacije se šalju POSLIJE COMMIT-a kao "best-effort"                */
+/*  - PRAVA transakcija (client = pool.connect())                             */
+/*  - Notifikacije poslije COMMIT-a (best-effort)                             */
 /* -------------------------------------------------------------------------- */
-router.post('/confessions/:id/like', requireAuth, async (req, res) => {
+router.post('/confessions/:id/like', requireAuth, lightActionLimiter, async (req, res) => {
   const confessionId = Number(req.params.id);
   const userId = Number(req.session.user?.id);
 
@@ -227,7 +262,7 @@ router.post('/confessions/:id/like', requireAuth, async (req, res) => {
 
     await client.query('COMMIT');
 
-    // ▼ Notifikacije poslije COMMIT-a (best-effort: greška ne ruši lajk)
+    // Notifikacije poslije COMMIT-a (best-effort)
     try {
       // favoritima
       await query(
@@ -243,22 +278,24 @@ router.post('/confessions/:id/like', requireAuth, async (req, res) => {
         [confessionId, userId]
       );
 
-      // ▼ (OPCIONALNO) notifikacija AUTORU za lajk — otkomentariši i proširi CHECK
-      
-      await query(
-        `INSERT INTO notifications (user_id, confession_id, type, is_read, payload)
-         SELECT c.user_id, $1::bigint, 'like_on_confession', FALSE,
-                jsonb_build_object(
-                  'by_user_id', $2::bigint,
-                  'at', to_char(NOW(), 'YYYY-MM-DD"T"HH24:MI:SSOF')
-                )
-         FROM confessions c
-         WHERE c.id = $1::bigint
-           AND c.user_id IS NOT NULL
-           AND c.user_id <> $2::bigint`,
-        [confessionId, userId]
-      );
-      
+      // (OPCIONALNO) notifikacija AUTORU za lajk — zahtijeva proširen CHECK
+      try {
+        await query(
+          `INSERT INTO notifications (user_id, confession_id, type, is_read, payload)
+           SELECT c.user_id, $1::bigint, 'like_on_confession', FALSE,
+                  jsonb_build_object(
+                    'by_user_id', $2::bigint,
+                    'at', to_char(NOW(), 'YYYY-MM-DD"T"HH24:MI:SSOF')
+                  )
+           FROM confessions c
+           WHERE c.id = $1::bigint
+             AND c.user_id IS NOT NULL
+             AND c.user_id <> $2::bigint`,
+          [confessionId, userId]
+        );
+      } catch (e) {
+        console.error('notif like->author error (ignored):', e);
+      }
     } catch (e) {
       console.error('notif like error (ignored):', e);
     }
@@ -279,12 +316,12 @@ router.post('/confessions/:id/like', requireAuth, async (req, res) => {
 });
 
 /* -------------------------------------------------------------------------- */
-/*  5) Odobravanje (JSON ili redirect)                                        */
+/*  5) Odobravanje (approve)                                                  */
 /*  - PRAVA transakcija                                                       */
 /*  - Notifikacije poslije COMMIT-a (best-effort)                             */
 /*  - Objavi kad score >= 10 (waiting/rejected_ai -> published)               */
 /* -------------------------------------------------------------------------- */
-router.post('/confessions/:id/approve', async (req, res) => {
+router.post('/confessions/:id/approve', lightActionLimiter, async (req, res) => {
   const confessionId = Number(req.params.id);
   if (!Number.isInteger(confessionId)) {
     return wantsJSON(req)
@@ -332,7 +369,7 @@ router.post('/confessions/:id/approve', async (req, res) => {
 
     await client.query('COMMIT');
 
-    // ▼ Notifikacije favoritima (best-effort)
+    // Notifikacije favoritima (best-effort)
     try {
       await query(
         `INSERT INTO notifications (user_id, confession_id, type, is_read, payload)
@@ -369,7 +406,7 @@ router.post('/confessions/:id/approve', async (req, res) => {
 /* -------------------------------------------------------------------------- */
 /*  6) Favoriti                                                               */
 /* -------------------------------------------------------------------------- */
-router.post('/confessions/:id/favorite', requireAuth, async (req, res) => {
+router.post('/confessions/:id/favorite', requireAuth, lightActionLimiter, async (req, res) => {
   const confessionId = Number(req.params.id);
   const userId = Number(req.session.user.id);
   try {
@@ -379,14 +416,14 @@ router.post('/confessions/:id/favorite', requireAuth, async (req, res) => {
        ON CONFLICT DO NOTHING`,
       [userId, confessionId]
     );
-    res.redirect('back');
+    return res.redirect('back');
   } catch (err) {
     console.error('favorite error', err);
-    res.status(500).send('Greška pri dodavanju u favorite.');
+    return res.status(500).send('Greška pri dodavanju u favorite.');
   }
 });
 
-router.post('/confessions/:id/unfavorite', requireAuth, async (req, res) => {
+router.post('/confessions/:id/unfavorite', requireAuth, lightActionLimiter, async (req, res) => {
   const confessionId = Number(req.params.id);
   const userId = Number(req.session.user.id);
   try {
@@ -394,10 +431,10 @@ router.post('/confessions/:id/unfavorite', requireAuth, async (req, res) => {
       `DELETE FROM favorites WHERE user_id = $1 AND confession_id = $2`,
       [userId, confessionId]
     );
-    res.redirect('back');
+    return res.redirect('back');
   } catch (err) {
     console.error('unfavorite error', err);
-    res.status(500).send('Greška pri uklanjanju iz favorita.');
+    return res.status(500).send('Greška pri uklanjanju iz favorita.');
   }
 });
 
@@ -408,28 +445,27 @@ router.get('/favorites', requireAuth, async (req, res) => {
   const userId = Number(req.session.user.id);
   try {
     const { rows } = await query(
-  `SELECT c.id, c.text,
-          (SELECT COUNT(*)::int FROM likes l WHERE l.confession_id = c.id) AS like_count,
-          (SELECT COUNT(*)::int FROM comments cm WHERE cm.confession_id = c.id) AS comment_count,
-          (SELECT COUNT(*)::int FROM favorites ff WHERE ff.confession_id = c.id) AS favorite_count,
-          f.created_at AS fav_since
-   FROM favorites f
-   JOIN confessions c ON c.id = f.confession_id
-   WHERE f.user_id = $1
-   ORDER BY f.created_at DESC
-   LIMIT 100`,
-  [userId]
-);
+      `SELECT c.id, c.text,
+              (SELECT COUNT(*)::int FROM likes l WHERE l.confession_id = c.id) AS like_count,
+              (SELECT COUNT(*)::int FROM comments cm WHERE cm.confession_id = c.id) AS comment_count,
+              (SELECT COUNT(*)::int FROM favorites ff WHERE ff.confession_id = c.id) AS favorite_count,
+              f.created_at AS fav_since
+       FROM favorites f
+       JOIN confessions c ON c.id = f.confession_id
+       WHERE f.user_id = $1
+       ORDER BY f.created_at DESC
+       LIMIT 100`,
+      [userId]
+    );
 
-
-    res.render('favorites', {
+    return res.render('favorites', {
       title: 'Moji favoriti',
       currentUser: req.session.user,
       confessions: rows
     });
   } catch (err) {
     console.error('favorites list error', err);
-    res.status(500).send('Greška pri učitavanju favorita.');
+    return res.status(500).send('Greška pri učitavanju favorita.');
   }
 });
 
