@@ -2,12 +2,9 @@
 const express = require('express');
 const router = express.Router();
 const { pool, query } = require('../db');
+const { limitApprove } = require('../middleware/limits');
 
-/**
- * Helper: identitet za "approve"
- * - Ako je ulogovan ➝ userId i weight=3
- * - Ako je gost      ➝ sessionTokenHash i weight=1
- */
+/** Helper: identitet za "approve" */
 function getApprover(req) {
   if (req.session?.user?.id) {
     return { userId: Number(req.session.user.id), sessionTokenHash: null, weight: 3 };
@@ -15,16 +12,11 @@ function getApprover(req) {
   return { userId: null, sessionTokenHash: req.sessionID, weight: 1 };
 }
 
-/**
- * GET /approve
- * Vrati jednu ispovijest u statusu waiting/rejected_ai
- * koju ovaj korisnik/gost još NIJE odobrio.
- */
-router.get('/approve', async (req, res) => {
+/** GET /approve – sljedeća neodobrena ispovijest za ovog usera/sesiju */
+router.get('/approve', limitApprove, async (req, res) => {
   const { userId, sessionTokenHash } = getApprover(req);
 
   try {
-    // Odaberi id sljedeće podobne ispovijesti
     const { rows: pick } = await query(
       `
       SELECT c.id, c.text, c.created_at
@@ -49,7 +41,7 @@ router.get('/approve', async (req, res) => {
     return res.render('approve', {
       title: 'Odobravanje',
       currentUser: req.session.user || null,
-      confession, // može biti null → UI će ponuditi poruku "nema više"
+      confession,
     });
   } catch (err) {
     console.error('approve GET error', err);
@@ -57,11 +49,8 @@ router.get('/approve', async (req, res) => {
   }
 });
 
-/**
- * POST /approve/:id/yes  — evidentiraj odobrenje i (ako treba) objavi
- * Na kraju redirect nazad na /approve (sljedeća ispovijest)
- */
-router.post('/approve/:id/yes', async (req, res) => {
+/** POST /approve/:id/yes – evidentiraj odobrenje i (ako treba) objavi */
+router.post('/approve/:id/yes', limitApprove, async (req, res) => {
   const confessionId = Number(req.params.id);
   if (!Number.isInteger(confessionId)) {
     return res.status(400).send('Neispravan ID ispovijesti.');
@@ -73,7 +62,6 @@ router.post('/approve/:id/yes', async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // upiši odobrenje (jednom po user/session) — ON CONFLICT ako već postoji
     await client.query(
       `INSERT INTO approvals (confession_id, user_id, session_token_hash, weight)
        VALUES ($1, $2, $3, $4)
@@ -81,7 +69,6 @@ router.post('/approve/:id/yes', async (req, res) => {
       [confessionId, userId, sessionTokenHash, weight]
     );
 
-    // izračunaj score
     const { rows: sc } = await client.query(
       `SELECT COALESCE(SUM(weight),0)::int AS score
        FROM approvals WHERE confession_id = $1`,
@@ -89,7 +76,6 @@ router.post('/approve/:id/yes', async (req, res) => {
     );
     const score = sc[0].score;
 
-    // publish prag = 10 (kao i u confessions.js)
     if (score >= 10) {
       await client.query(
         `UPDATE confessions
@@ -108,14 +94,11 @@ router.post('/approve/:id/yes', async (req, res) => {
     client.release();
   }
 
-  // odmah sljedeća
   return res.redirect('/approve');
 });
 
-/**
- * POST /approve/:id/skip — preskoči bez akcije (samo redirect)
- */
-router.post('/approve/:id/skip', (req, res) => {
+/** POST /approve/:id/skip – preskoči bez akcije */
+router.post('/approve/:id/skip', limitApprove, (req, res) => {
   return res.redirect('/approve');
 });
 

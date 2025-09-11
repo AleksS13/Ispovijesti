@@ -8,7 +8,7 @@
           ? `<div class="alert alert-success">Nema više ispovijesti za odobravanje. 🎉</div>`
           : `
             <div class="mb-3">
-              <p class="fs-5">${confession.text}</p>
+              <p class="fs-5">${escape(confession.text)}</p>
               <small class="text-muted">Kreirano: ${new Date(confession.created_at).toLocaleString()}</small>
             </div>
 

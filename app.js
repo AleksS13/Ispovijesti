@@ -14,7 +14,7 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const notificationsRoutes = require('./routes/notifications');
 // ⚠️ approve ruta je već u routes/confessions.js — ne uvodimo duplikat
-// const approveRoutes = require('./routes/approve');
+const approveRoutes = require('./routes/approve');
 
 // DB test
 pool.query('SELECT NOW()')
@@ -107,7 +107,7 @@ app.use('/', adminRoutes);
 app.use('/auth', authRoutes);
 app.use('/', userRoutes);
 app.use('/', notificationsRoutes);
-// app.use('/', approveRoutes); // (izbjegavamo duplikat approve rute)
+ app.use('/', approveRoutes); // (izbjegavamo duplikat approve rute)
 
 // Landing
 app.get('/', (req, res) => {
