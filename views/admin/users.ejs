@@ -17,8 +17,8 @@
         ${users.map(u => `
           <tr>
             <td>${u.id}</td>
-            <td>${u.email}</td>
-            <td><span class="badge ${u.role === 'admin' ? 'bg-danger' : 'bg-secondary'}">${u.role}</span></td>
+            <td>${escape(u.email)}</td>
+            <td><span class="badge ${u.role === 'admin' ? 'bg-danger' : 'bg-secondary'}">${escape(u.role)}</span></td>
             <td>
               ${u.is_active
                 ? '<span class="badge bg-success">aktivno</span>'
@@ -28,7 +28,7 @@
                 : ''}
             </td>
             <td>
-              ❤️ ${u.conf_count} &nbsp;|&nbsp; 💬 ${u.comment_count}
+              ❤️ ${Number(u.conf_count)} &nbsp;|&nbsp; 💬 ${Number(u.comment_count)}
             </td>
             <td class="text-end">
               <div class="d-flex gap-1 justify-content-end flex-wrap">
@@ -41,19 +41,16 @@
                      </form>`
                 }
 
-                <!-- Blokiraj 15 -->
                 <form method="POST" action="/admin/users/${u.id}/block">
                   <input type="hidden" name="days" value="15"/>
                   <button class="btn btn-sm btn-outline-warning">Blokiraj 15d</button>
                 </form>
 
-                <!-- Blokiraj 30 -->
                 <form method="POST" action="/admin/users/${u.id}/block">
                   <input type="hidden" name="days" value="30"/>
                   <button class="btn btn-sm btn-outline-warning">Blokiraj 30d</button>
                 </form>
 
-                <!-- Unblock -->
                 <form method="POST" action="/admin/users/${u.id}/unblock">
                   <button class="btn btn-sm btn-outline-primary">Unblock</button>
                 </form>
@@ -65,7 +62,6 @@
     </table>
   </div>
 
-  <!-- Pager -->
   <nav class="mt-3">
     <ul class="pagination">
       <li class="page-item ${page <= 1 ? 'disabled' : ''}">

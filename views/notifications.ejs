@@ -13,33 +13,56 @@
         ? `<div class="alert alert-warning">Nemate novih notifikacija.</div>`
         : `
           <ul class="list-group">
-            ${notifications.map(n => `
-              <li class="list-group-item d-flex justify-content-between align-items-start ${n.is_read ? '' : 'list-group-item-info'}">
-                <div class="ms-2 me-auto">
-                  <div class="fw-bold">
-                    ${
-                      n.type === 'like_on_favorite'   ? 'Lajk na sačuvanoj ispovijesti' :
-                      n.type === 'comment_on_favorite' ? 'Novi komentar na sačuvanoj ispovijesti' :
-                      n.type === 'approve_on_favorite' ? 'Odobravanje na sačuvanoj ispovijesti' :
-                      n.type === 'like_on_confession'  ? 'Lajk na vašoj ispovijesti' :
-                      n.type.replaceAll('_',' ')
-                    }
-                    <small class="text-muted">
-                      <a href="/confessions/${n.confession_id}">#${n.confession_id}</a>
-                    </small>
-                  </div>
-                  <small class="text-muted">${new Date(n.created_at).toLocaleString()}</small>
-                  <pre class="mb-0 mt-2" style="white-space: pre-wrap;">${JSON.stringify(n.payload, null, 2)}</pre>
-                </div>
+            ${notifications.map(n => {
+              const p = n.payload || {};
+              const when = new Date(n.created_at).toLocaleString();
+              const link = "/confessions/" + n.confession_id;
 
-                ${n.is_read
-                  ? `<span class="badge bg-secondary align-self-center">pročitano</span>`
-                  : `<form method="POST" action="/notifications/${n.id}/read">
-                       <button class="btn btn-sm btn-outline-secondary">Označi kao pročitano</button>
-                     </form>`
-                }
-              </li>
-            `).join('')}
+              // tekst poruke po tipu (bez unutrašnjih backticka)
+              let label = '🔔 Nova notifikacija.';
+              if (n.type === 'like_on_favorite') {
+                label = '👍 Neko je lajkovao ispovijest koju ste sačuvali.';
+              } else if (n.type === 'comment_on_favorite') {
+                label = '💬 Novi komentar na sačuvanoj ispovijesti: <em>' + escape(p.snippet || '') + '</em>';
+              } else if (n.type === 'approve_on_favorite') {
+                label = '✅ Neko je odobrio sačuvanu ispovijest' + (p.weight ? ' (+' + p.weight + ')' : '') + '.';
+              } else if (n.type === 'like_on_confession') {
+                label = '👍 Neko je lajkovao vašu ispovijest.';
+              } else if (n.type === 'comment_on_confession') {
+                label = '💌 Novi komentar na vašoj ispovijesti: <em>' + escape(p.snippet || '') + '</em>';
+              }
+
+              const knownTypes = [
+                'like_on_favorite',
+                'comment_on_favorite',
+                'approve_on_favorite',
+                'like_on_confession',
+                'comment_on_confession'
+              ];
+
+              return ''
+              + '<li class="list-group-item d-flex justify-content-between align-items-start ' + (n.is_read ? '' : 'list-group-item-info') + '">'
+                + '<div class="ms-2 me-auto">'
+                  + '<div class="fw-bold">' + label
+                    + ' <small class="text-muted"><a href="' + link + '">#' + n.confession_id + '</a></small>'
+                  + '</div>'
+                  + '<small class="text-muted d-block">' + when + '</small>'
+                  + (knownTypes.indexOf(n.type) === -1
+                      ? '<details class="mt-2">'
+                          + '<summary class="text-muted">Detalji</summary>'
+                          + '<pre class="mb-0 mt-2" style="white-space: pre-wrap;">'
+                            + escape(JSON.stringify(p, null, 2))
+                          + '</pre>'
+                        + '</details>'
+                      : '')
+                + '</div>'
+                + (n.is_read
+                    ? '<span class="badge bg-secondary align-self-center">pročitano</span>'
+                    : '<form method="POST" action="/notifications/' + n.id + '/read">'
+                        + '<button class="btn btn-sm btn-outline-secondary">Označi kao pročitano</button>'
+                      + '</form>')
+              + '</li>';
+            }).join('')}
           </ul>
 
           <form method="POST" action="/notifications/read-all" class="mt-3">

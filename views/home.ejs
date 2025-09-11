@@ -5,7 +5,7 @@
         <h2 class="mb-3">Početna</h2>
 
         ${currentUser
-          ? `<div class="alert alert-success">Prijavljeni ste kao <strong>${currentUser.email}</strong>.</div>`
+          ? `<div class="alert alert-success">Prijavljeni ste kao <strong>${escape(currentUser.email)}</strong>.</div>`
           : `<div class="alert alert-info">Pregledavate kao <strong>Gost</strong>. 
                <a href="/auth/login">Prijava</a> ili 
                <a href="/auth/register">Registracija</a>.</div>` }
@@ -29,19 +29,19 @@
           ? `<div class="list-group mb-3">
                ${confessions.map(c => `
                  <div class="list-group-item">
-                   <p>${c.text}</p>
+                   <p>${escape(c.text)}</p>
                    <div class="d-flex align-items-center gap-2">
 
                      <!-- 👍 Like dugme -->
                      <button class="btn btn-sm btn-outline-primary like-btn" data-id="${c.id}">
                        👍 <span class="like-count" id="like-count-${c.id}" data-id="${c.id}">
-                         ${c.like_count || 0}
+                         ${Number(c.like_count || 0)}
                        </span>
                      </button>
 
                      <!-- 💬 i ⭐ -->
-                     <small class="text-muted">💬 ${c.comment_count || 0}</small>
-                     <small class="text-muted">⭐ ${c.favorite_count || 0}</small>
+                     <small class="text-muted">💬 ${Number(c.comment_count || 0)}</small>
+                     <small class="text-muted">⭐ ${Number(c.favorite_count || 0)}</small>
 
                      <!-- 🏷️ Status: feed pokazuje samo objavljene -->
                      <span class="badge bg-success ms-2 status-badge" data-id="${c.id}">

@@ -25,7 +25,7 @@
   <ul class="list-group">
     <% confessions.forEach(c => { %>
       <li class="list-group-item">
-        <div><strong>#<%= c.id %></strong> – <%= c.text %></div>
+        <div><strong>#<%= c.id %></strong> – <%= escape(c.text) %></div>
         <small class="text-muted"><%= new Date(c.created_at).toLocaleString() %></small>
         <div class="mt-2">
           <form method="POST" action="/admin/confessions/<%= c.id %>/publish" class="d-inline">
@@ -42,7 +42,6 @@
     <% }) %>
   </ul>
 
-  <!-- Pager -->
   <nav class="mt-3">
     <ul class="pagination mb-0">
       <li class="page-item <%= page <= 1 ? 'disabled' : '' %>">

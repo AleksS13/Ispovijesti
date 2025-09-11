@@ -1,4 +1,37 @@
 <%- include('../partials/layout', {
-  title: title,
-  body: include('../partials/my_confessions_body', { confessions })
+  title: 'Moje ispovijesti',
+  body: `
+    <h2 class="mb-3">Moje ispovijesti</h2>
+
+    ${confessions.length === 0
+      ? `<div class="alert alert-info">Još nemaš nijednu ispovijest.</div>`
+      : `
+        <div class="list-group">
+          ${confessions.map(c => `
+            <div class="list-group-item">
+              <div class="d-flex justify-content-between align-items-start">
+                <div class="me-3">
+                  <p class="mb-1">${escape(c.text)}</p>
+                  <small class="text-muted">
+                    Status:
+                    <span class="badge ${c.status === 'published' ? 'bg-success' : (c.status === 'waiting' ? 'bg-warning text-dark' : 'bg-secondary')}">
+                      ${escape(c.status)}
+                    </span>
+                    ${c.status === 'published' && c.published_at
+                      ? ` | Objavljeno: ${new Date(c.published_at).toLocaleString()}`
+                      : ` | Kreirano: ${new Date(c.created_at).toLocaleString()}`
+                    }
+                    | ❤️ ${Number(c.like_count)} | 💬 ${Number(c.comment_count)} | ⭐ ${Number(c.favorite_count)}
+                  </small>
+                </div>
+                <div class="text-end">
+                  <a class="btn btn-sm btn-outline-primary" href="/confessions/${c.id}">Detalji</a>
+                </div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `
+    }
+  `
 }) %>
