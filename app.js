@@ -13,7 +13,6 @@ const adminRoutes = require('./routes/admin');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const notificationsRoutes = require('./routes/notifications');
-// ⚠️ approve ruta je već u routes/confessions.js — ne uvodimo duplikat
 const approveRoutes = require('./routes/approve');
 
 // DB test
