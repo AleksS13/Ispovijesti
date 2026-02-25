@@ -28,25 +28,25 @@ Ispovijesti is a full-stack web application for anonymous confessions where user
 ## 📸 Screenshots
 
 ### Home page
-![Home](screenshots/homepage.png)
+![Home](public/screenshots/homepage.png)
 
 ### Login
-![Login](screenshots/login.png)
+![Login](public/screenshots/login.png)
 
 ### New confession
-![New Confession](screenshots/novaispovijest.png)
+![New Confession](public/screenshots/novaispovijest.png)
 
 ### Favorites
-![Favorites](screenshots/favoriti.png)
+![Favorites](public/screenshots/favoriti.png)
 
 ### Notifications
-![Notifications](screenshots/notifikacije.png)
+![Notifications](public/screenshots/notifikacije.png)
 
 ### Admin panel
-![Admin Panel](screenshots/adminpanel.png)
+![Admin Panel](public/screenshots/adminpanel.png)
 
 ### Admin users
-![Admin Users](screenshots/admin-korisnici.png)
+![Admin Users](public/screenshots/admin-korisnici.png)
 
 ---
 
